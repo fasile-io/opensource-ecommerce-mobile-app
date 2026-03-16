@@ -90,20 +90,6 @@ cd <repository-name>
 flutter pub get
 ```
 
-### Generate Required files
-
-- Navigate to the project's directory
-
-```sh
-cd <repository-name>
-```
-
-- Run the following command to generate the required files
-
-```sh
-flutter pub run build_runner build --delete-conflicting-outputs 
-```
-
 ### Connect a device or emulator
 
 - Physical Device
@@ -126,7 +112,7 @@ flutter run
 ## Minimum Versions
 
 - Android: 22
-- iOS: 16
+- iOS: 15.5
 
 ## Configurations Steps
 
@@ -164,7 +150,6 @@ class AppColors {
 **To change the primary color:**
 - Replace `0xFFFF6900` with your desired color hex value
 - Adjust `primary600` to a slightly darker shade of your primary color
-```
 
 ### For Push Notification Service
 
@@ -193,19 +178,12 @@ Replace "GoogleService-Info.plist".
 
   1. Go to the general tab and identity change the display name to your app name
 
-> For Homepage Header Title - Go to ‘assets/language/en.json’
-> (Note: Here, “en” in en.json refers to the languages that would be supported within the application)
-
 ### For Splash Screen
 
 - For adding an Image as a Splash Screen
 
   1. **Path:** assets/images/splash.png
-  2. After updating the Image file, update the ‘splashImage’ in lib/utils/assets_constants.
-
-```sh
-  static const String splashImage = "assets/images/splash.png";
-```
+  2. No additional constant update is required. The splash image is loaded directly in `lib/features/splash/presentation/splash_screen.dart`.
 
 ### For App Icon
 
