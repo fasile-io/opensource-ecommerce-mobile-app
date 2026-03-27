@@ -192,7 +192,7 @@ Replace "GoogleService-Info.plist".
 
 ## Installation Video
 
-[![Watch the video](https://i.ibb.co/c6qd31t/thumbnail-1.jpg)](https://www.youtube.com/watch?v=tvm2NUZP9ks)
+[![Watch the video](https://i.ibb.co/c6qd31t/thumbnail-1.jpg)](https://www.youtube.com/watch?v=EbXpRK6teCY)
 
 ## API Documentation
 
