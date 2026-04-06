@@ -107,6 +107,9 @@ class HomeProduct extends Equatable {
   final double price;
   final double? minimumPrice;
   final double? specialPrice;
+  final String? formattedPrice;
+  final String? formattedMinimumPrice;
+  final String? formattedSpecialPrice;
   final bool isSaleable;
   final double averageRating;
   final int reviewCount;
@@ -122,6 +125,9 @@ class HomeProduct extends Equatable {
     required this.price,
     this.minimumPrice,
     this.specialPrice,
+    this.formattedPrice,
+    this.formattedMinimumPrice,
+    this.formattedSpecialPrice,
     required this.isSaleable,
     this.averageRating = 0,
     this.reviewCount = 0,
@@ -161,9 +167,11 @@ class HomeProduct extends Equatable {
         .map((e) => _toDouble((e['node'] as Map<String, dynamic>?)?['rating']))
         .where((r) => r > 0)
         .toList();
+    final fallbackRating = _toDouble(json['averageRating']);
     final avgRating = ratings.isNotEmpty
         ? ratings.reduce((a, b) => a + b) / ratings.length
-        : 0.0;
+        : fallbackRating;
+    final fallbackReviewCount = (json['reviewCount'] as num?)?.toInt() ?? 0;
 
     return HomeProduct(
       id: json['id']?.toString() ?? '',
@@ -176,10 +184,34 @@ class HomeProduct extends Equatable {
       price: _toDouble(json['price']),
       minimumPrice: json['minimumPrice'] != null ? _toDouble(json['minimumPrice']) : null,
       specialPrice: parsedSpecialPrice,
+      formattedPrice: json['formattedPrice'] as String?,
+      formattedMinimumPrice: json['formattedMinimumPrice'] as String?,
+      formattedSpecialPrice: json['formattedSpecialPrice'] as String?,
       isSaleable: json['isSaleable'] == true,
       averageRating: avgRating,
-      reviewCount: ratings.length,
+      reviewCount: ratings.isNotEmpty ? ratings.length : fallbackReviewCount,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      '_id': numericId,
+      'sku': sku,
+      'type': type,
+      'name': name,
+      'urlKey': urlKey,
+      'baseImageUrl': baseImageUrl,
+      'price': price,
+      'minimumPrice': minimumPrice,
+      'specialPrice': specialPrice,
+      'formattedPrice': formattedPrice,
+      'formattedMinimumPrice': formattedMinimumPrice,
+      'formattedSpecialPrice': formattedSpecialPrice,
+      'isSaleable': isSaleable,
+      'averageRating': averageRating,
+      'reviewCount': reviewCount,
+    };
   }
 
   /// The effective display price: specialPrice > minimumPrice > price
@@ -200,8 +232,44 @@ class HomeProduct extends Equatable {
     return (((price - specialPrice!) / price) * 100).round();
   }
 
+  String get displayPriceLabel {
+    if (specialPrice != null &&
+        specialPrice! > 0 &&
+        (formattedSpecialPrice?.isNotEmpty ?? false)) {
+      return formattedSpecialPrice!;
+    }
+    if (type == 'configurable' &&
+        minimumPrice != null &&
+        minimumPrice! > 0 &&
+        (formattedMinimumPrice?.isNotEmpty ?? false)) {
+      return formattedMinimumPrice!;
+    }
+    return formattedPrice ?? price.toStringAsFixed(2);
+  }
+
+  String? get originalPriceLabel {
+    if (hasDiscount && (formattedPrice?.isNotEmpty ?? false)) {
+      return formattedPrice;
+    }
+    return null;
+  }
+
   @override
-  List<Object?> get props => [id, numericId, sku, type, name, urlKey, baseImageUrl, price, averageRating, reviewCount];
+  List<Object?> get props => [
+    id,
+    numericId,
+    sku,
+    type,
+    name,
+    urlKey,
+    baseImageUrl,
+    price,
+    formattedPrice,
+    formattedMinimumPrice,
+    formattedSpecialPrice,
+    averageRating,
+    reviewCount,
+  ];
 }
 
 /// An image entry inside an image_carousel customization.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/account_models.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// Address card widget — Figma "billing" component (node-id=204:4494)
 ///
@@ -28,11 +29,12 @@ class AddressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Semantics(
       label:
-          'Address for ${address.fullName}${address.isDefault ? ', default address' : ''}',
+          'Address for ${address.fullName}${address.isDefault ? ', ${l10n.accountDefault}' : ''}',
       container: true,
       child: Container(
         width: double.infinity,
@@ -45,7 +47,7 @@ class AddressCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Tags row: address type + default badge ──
-            _buildTagsRow(isDark),
+            _buildTagsRow(l10n, isDark),
 
             const SizedBox(height: 12),
 
@@ -79,7 +81,7 @@ class AddressCard extends StatelessWidget {
             const SizedBox(height: 12),
 
             // ── Action buttons row ──
-            _buildActionsRow(isDark),
+            _buildActionsRow(l10n, isDark),
           ],
         ),
       ),
@@ -88,8 +90,8 @@ class AddressCard extends StatelessWidget {
 
   /// Tags row: address type badge + optional "Default" badge
   /// Figma: node-id=204:5047
-  Widget _buildTagsRow(bool isDark) {
-    final typeLabel = _addressTypeLabel;
+  Widget _buildTagsRow(AppLocalizations l10n, bool isDark) {
+    final typeLabel = _addressTypeLabel(l10n);
 
     return Row(
       children: [
@@ -99,7 +101,7 @@ class AddressCard extends StatelessWidget {
         if (typeLabel.isNotEmpty && address.isDefault) const SizedBox(width: 4),
 
         // "Default" tag — only shown when address is default
-        if (address.isDefault) _buildTag('Default', isDark),
+        if (address.isDefault) _buildTag(l10n.accountDefault, isDark),
       ],
     );
   }
@@ -130,21 +132,26 @@ class AddressCard extends StatelessWidget {
 
   /// Action buttons: Select Address | Set as Default | Edit
   /// Figma: node-id=204:5134
-  Widget _buildActionsRow(bool isDark) {
+  Widget _buildActionsRow(AppLocalizations l10n, bool isDark) {
     return Wrap(
       spacing: 24,
       runSpacing: 8,
       children: [
-        if (onSelect != null) _buildActionButton('Select Address', onSelect!),
+        if (onSelect != null)
+          _buildActionButton(l10n.accountSelectAddress, onSelect!),
 
         // Show "Set as Default" only if NOT already default
         if (!address.isDefault && onSetDefault != null)
-          _buildActionButton('Set as Default', onSetDefault!),
+          _buildActionButton(l10n.accountSetAsDefault, onSetDefault!),
 
-        if (onEdit != null) _buildActionButton('Edit', onEdit!),
+        if (onEdit != null) _buildActionButton(l10n.commonEdit, onEdit!),
 
         if (onDelete != null)
-          _buildActionButton('Delete', onDelete!, isDestructive: true),
+          _buildActionButton(
+            l10n.accountDelete,
+            onDelete!,
+            isDestructive: true,
+          ),
       ],
     );
   }
@@ -186,10 +193,21 @@ class AddressCard extends StatelessWidget {
 
   /// Derive address type label from addressType field.
   /// Returns empty string if no type is set (instead of assuming "Home").
-  String get _addressTypeLabel {
+  String _addressTypeLabel(AppLocalizations l10n) {
     final type = address.addressType?.trim() ?? '';
     if (type.isEmpty) return '';
-    // Capitalize first letter
-    return type[0].toUpperCase() + type.substring(1).toLowerCase();
+    final lower = type.toLowerCase();
+    switch (lower) {
+      case 'home':
+        return l10n.accountAddressTypeHome;
+      case 'office':
+      case 'work':
+        return l10n.accountAddressTypeOffice;
+      case 'customer':
+        return l10n.accountAddressTypeCustomer;
+      default:
+        // Capitalize fallback
+        return type[0].toUpperCase() + type.substring(1).toLowerCase();
+    }
   }
 }

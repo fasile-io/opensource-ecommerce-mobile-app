@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/currency/currency_formatter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../cart/data/models/cart_model.dart';
 import '../../../product/presentation/pages/product_detail_page.dart';
 import '../../../checkout/presentation/pages/checkout_page.dart';
@@ -58,6 +60,7 @@ class CartPage extends StatefulWidget {
 class _CartPageState extends State<CartPage> {
   final TextEditingController _couponController = TextEditingController();
   final FocusNode _couponFocusNode = FocusNode();
+  final Set<int> _expandedItems = {};
 
   @override
   void dispose() {
@@ -71,7 +74,11 @@ class _CartPageState extends State<CartPage> {
     return BlocConsumer<CartBloc, CartState>(
       listener: (context, state) {
         if (state.successMessage != null) {
-          _showToast(context, state.successMessage!, isError: false);
+          _showToast(
+            context,
+            _localizedCartMessage(context, state.successMessage!),
+            isError: false,
+          );
           context.read<CartBloc>().add(ClearCartMessage());
         }
         if (state.errorMessage != null) {
@@ -132,7 +139,7 @@ class _CartPageState extends State<CartPage> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                'Cart',
+                AppLocalizations.of(context)!.cart,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 16,
@@ -149,10 +156,12 @@ class _CartPageState extends State<CartPage> {
               if (accessToken == null || accessToken.isEmpty) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please login to view wishlist'),
+                    SnackBar(
+                      content: Text(
+                        AppLocalizations.of(context)!.cartPleaseLoginWishlist,
+                      ),
                       backgroundColor: Colors.red,
-                      duration: Duration(seconds: 2),
+                      duration: const Duration(seconds: 2),
                     ),
                   );
                 }
@@ -169,12 +178,10 @@ class _CartPageState extends State<CartPage> {
                     builder: (_) => RepositoryProvider.value(
                       value: repository,
                       child: BlocProvider(
-                        create: (_) =>
-                            WishlistBloc(
-                              repository: repository,
-                              wishlistCubit: wishlistCubit,
-                            )
-                              ..add(const LoadWishlist()),
+                        create: (_) => WishlistBloc(
+                          repository: repository,
+                          wishlistCubit: wishlistCubit,
+                        )..add(const LoadWishlist()),
                         child: const WishlistPage(),
                       ),
                     ),
@@ -225,7 +232,12 @@ class _CartPageState extends State<CartPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                '${state.cart.itemsQty} ${state.cart.itemsQty == 1 ? 'Item' : 'Items'} in the Cart',
+                AppLocalizations.of(context)!.cartItemsInCart(
+                  state.cart.itemsQty,
+                  state.cart.itemsQty == 1
+                      ? AppLocalizations.of(context)!.cartUnit
+                      : AppLocalizations.of(context)!.cartUnits,
+                ),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
@@ -279,10 +291,13 @@ class _CartPageState extends State<CartPage> {
             color: isDark ? AppColors.neutral700 : AppColors.neutral200,
           ),
           const SizedBox(height: 16),
-          Text('Your cart is empty', style: AppTextStyles.text4(context)),
+          Text(
+            AppLocalizations.of(context)!.cartYourCartEmpty,
+            style: AppTextStyles.text4(context),
+          ),
           const SizedBox(height: 8),
           Text(
-            'Add products to your cart to see them here',
+            AppLocalizations.of(context)!.cartAddProductsHere,
             style: AppTextStyles.text6(
               context,
             ).copyWith(color: AppColors.neutral500),
@@ -301,8 +316,8 @@ class _CartPageState extends State<CartPage> {
                 color: AppColors.primary500,
                 borderRadius: BorderRadius.circular(54),
               ),
-              child: const Text(
-                'Continue Shopping',
+              child: Text(
+                AppLocalizations.of(context)!.cartContinueShopping,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
@@ -325,6 +340,9 @@ class _CartPageState extends State<CartPage> {
     bool isDark,
   ) {
     final isUpdating = state.updatingItemId == item.id;
+    final isBooking = item.isBooking;
+    final isExpanded = _expandedItems.contains(item.id);
+    final hasOptions = item.options.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -352,7 +370,9 @@ class _CartPageState extends State<CartPage> {
                         MaterialPageRoute(
                           builder: (_) => ProductDetailPage(
                             urlKey: item.productUrlKey!,
+                            productId: item.productId.toString(),
                             productName: item.name,
+                            productType: item.type,
                           ),
                         ),
                       );
@@ -372,12 +392,12 @@ class _CartPageState extends State<CartPage> {
                         ? CachedNetworkImage(
                             imageUrl: item.imageUrl!,
                             fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(
+                            placeholder: (context, url) => Container(
                               color: isDark
                                   ? AppColors.neutral700
                                   : AppColors.neutral200,
                             ),
-                            errorWidget: (_, __, ___) => Icon(
+                            errorWidget: (context, url, error) => Icon(
                               Icons.image_outlined,
                               size: 32,
                               color: isDark
@@ -419,20 +439,27 @@ class _CartPageState extends State<CartPage> {
                       // Price row: "$price x N Units" and "$total"
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '\$${item.price.toStringAsFixed(2)} x ${item.quantity} ${item.quantity == 1 ? 'Unit' : 'Units'}',
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w400,
-                              color: isDark
-                                  ? AppColors.neutral300
-                                  : AppColors.neutral900,
+                          Expanded(
+                            child: Text(
+                              isBooking
+                                  ? '${item.displayPrice} x N/A'
+                                  : '${item.displayPrice} x ${item.quantity} ${item.quantity == 1 ? AppLocalizations.of(context)!.cartUnit : AppLocalizations.of(context)!.cartUnits}',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                                color: isDark
+                                    ? AppColors.neutral300
+                                    : AppColors.neutral900,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
-                            '\$${item.totalPrice.toStringAsFixed(2)}',
+                            item.displayTotal,
                             style: TextStyle(
                               fontFamily: 'Roboto',
                               fontSize: 14,
@@ -449,69 +476,95 @@ class _CartPageState extends State<CartPage> {
                       // Quantity controls + Delete + Wishlist
                       Row(
                         children: [
-                          // Quantity stepper (Figma: swatch with border)
-                          Container(
-                            height: 36,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: isDark
-                                    ? AppColors.neutral700
-                                    : AppColors.neutral200,
+                          if (!isBooking)
+                            Container(
+                              height: 38,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
                               ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Decrement
-                                _buildStepperButton(
-                                  context,
-                                  icon: Icons.remove,
-                                  isDark: isDark,
-                                  enabled: item.quantity > 1 && !isUpdating,
-                                  onTap: () {
-                                    context.read<CartBloc>().add(
-                                      UpdateCartItemQuantity(
-                                        cartItemId: item.id,
-                                        quantity: item.quantity - 1,
-                                      ),
-                                    );
-                                  },
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppColors.neutral700
+                                      : AppColors.neutral200,
                                 ),
-                                // Quantity
-                                SizedBox(
-                                  width: 20,
-                                  child: Text(
-                                    '${item.quantity}',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w400,
-                                      color: isDark
-                                          ? AppColors.neutral200
-                                          : AppColors.neutral900,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _buildStepperButton(
+                                    context,
+                                    icon: Icons.remove,
+                                    isDark: isDark,
+                                    enabled: item.quantity > 1 && !isUpdating,
+                                    onTap: () {
+                                      context.read<CartBloc>().add(
+                                        UpdateCartItemQuantity(
+                                          cartItemId: item.id,
+                                          quantity: item.quantity - 1,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  SizedBox(
+                                    width: item.quantity >= 100 ? 42 : 34,
+                                    child: Text(
+                                      '${item.quantity}',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        color: isDark
+                                            ? AppColors.neutral200
+                                            : AppColors.neutral900,
+                                      ),
                                     ),
                                   ),
+                                  _buildStepperButton(
+                                    context,
+                                    icon: Icons.add,
+                                    isDark: isDark,
+                                    enabled: !isUpdating,
+                                    onTap: () {
+                                      context.read<CartBloc>().add(
+                                        UpdateCartItemQuantity(
+                                          cartItemId: item.id,
+                                          quantity: item.quantity + 1,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Container(
+                              height: 36,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppColors.neutral700
+                                      : AppColors.neutral200,
                                 ),
-                                // Increment
-                                _buildStepperButton(
-                                  context,
-                                  icon: Icons.add,
-                                  isDark: isDark,
-                                  enabled: !isUpdating,
-                                  onTap: () {
-                                    context.read<CartBloc>().add(
-                                      UpdateCartItemQuantity(
-                                        cartItemId: item.id,
-                                        quantity: item.quantity + 1,
-                                      ),
-                                    );
-                                  },
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'Qty: N/A',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  color: isDark
+                                      ? AppColors.neutral300
+                                      : AppColors.neutral700,
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
                           const SizedBox(width: 10),
                           // Delete
                           GestureDetector(
@@ -569,10 +622,14 @@ class _CartPageState extends State<CartPage> {
                                 }
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Moved to wishlist'),
+                                    SnackBar(
+                                      content: Text(
+                                        AppLocalizations.of(
+                                          context,
+                                        )!.cartMovedToWishlist,
+                                      ),
                                       backgroundColor: AppColors.successGreen,
-                                      duration: Duration(seconds: 2),
+                                      duration: const Duration(seconds: 2),
                                     ),
                                   );
                                 }
@@ -600,11 +657,59 @@ class _CartPageState extends State<CartPage> {
                           ),
                         ],
                       ),
+
+                      // ── View More / View Less toggle ──
+                      if (hasOptions) ...[
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              if (isExpanded) {
+                                _expandedItems.remove(item.id);
+                              } else {
+                                _expandedItems.add(item.id);
+                              }
+                            });
+                          },
+                          child: Text(
+                            isExpanded
+                                ? AppLocalizations.of(context)!.cartViewLess
+                                : AppLocalizations.of(context)!.cartViewMore,
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.process600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ],
             ),
+
+            // ── Expanded options (below the image row, full width) ──
+            if (hasOptions && isExpanded) ...[
+              const SizedBox(height: 16),
+              ...item.options.map(
+                (option) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    option,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w400,
+                      color: isDark
+                          ? AppColors.neutral200
+                          : AppColors.neutral900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -622,10 +727,10 @@ class _CartPageState extends State<CartPage> {
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         child: SizedBox(
-          width: 24,
-          height: 24,
+          width: 22,
+          height: 22,
           child: Icon(
             icon,
             size: 16,
@@ -670,7 +775,7 @@ class _CartPageState extends State<CartPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Continue Shopping',
+                      AppLocalizations.of(context)!.cartContinueShopping,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 14,
@@ -704,7 +809,7 @@ class _CartPageState extends State<CartPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Empty Cart',
+                      AppLocalizations.of(context)!.cartEmptyCartAction,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 14,
@@ -737,7 +842,7 @@ class _CartPageState extends State<CartPage> {
         children: [
           // Title
           Text(
-            'Apply Coupon',
+            AppLocalizations.of(context)!.cartApplyCoupon,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 16,
@@ -768,7 +873,7 @@ class _CartPageState extends State<CartPage> {
                           : AppColors.neutral900,
                     ),
                     decoration: InputDecoration(
-                      labelText: 'Coupon Code',
+                      labelText: AppLocalizations.of(context)!.cartCouponCode,
                       labelStyle: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 12,
@@ -851,9 +956,9 @@ class _CartPageState extends State<CartPage> {
                             color: AppColors.white,
                           ),
                         )
-                      : const Text(
-                          'Apply',
-                          style: TextStyle(
+                      : Text(
+                          AppLocalizations.of(context)!.cartApply,
+                          style: const TextStyle(
                             fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -884,7 +989,7 @@ class _CartPageState extends State<CartPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Applied Coupon',
+                        AppLocalizations.of(context)!.cartAppliedCoupon,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 14,
@@ -911,9 +1016,9 @@ class _CartPageState extends State<CartPage> {
                       _couponController.clear();
                       context.read<CartBloc>().add(RemoveCoupon());
                     },
-                    child: const Text(
-                      'Remove',
-                      style: TextStyle(
+                    child: Text(
+                      AppLocalizations.of(context)!.cartRemove,
+                      style: const TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -938,7 +1043,7 @@ class _CartPageState extends State<CartPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Price Break',
+            AppLocalizations.of(context)!.cartPriceBreak,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 16,
@@ -951,8 +1056,8 @@ class _CartPageState extends State<CartPage> {
           // SubTotal
           _buildPriceRow(
             context,
-            'SubTotal',
-            '\$${_formatPrice(cart.subtotal)}',
+            AppLocalizations.of(context)!.cartSubTotal,
+            cart.formattedSubtotal ?? CurrencyFormatter.formatAmount(cart.subtotal),
             isDark,
           ),
           const SizedBox(height: 8),
@@ -960,10 +1065,10 @@ class _CartPageState extends State<CartPage> {
           // Discount
           _buildPriceRow(
             context,
-            'Discount',
+            AppLocalizations.of(context)!.cartDiscount,
             cart.discountAmount > 0
-                ? '-\$${_formatPrice(cart.discountAmount)}'
-                : '\$0.00',
+                ? '-${cart.formattedDiscountAmount ?? CurrencyFormatter.formatAmount(cart.discountAmount)}'
+                : CurrencyFormatter.formatAmount(0),
             isDark,
             valueColor: cart.discountAmount > 0 ? AppColors.success700 : null,
           ),
@@ -972,10 +1077,11 @@ class _CartPageState extends State<CartPage> {
           // Delivery Charges
           _buildPriceRow(
             context,
-            'Delivery Charges',
+            AppLocalizations.of(context)!.cartDeliveryCharges,
             cart.shippingAmount > 0
-                ? '\$${_formatPrice(cart.shippingAmount)}'
-                : '\$0.00',
+                ? (cart.formattedShippingAmount ??
+                    CurrencyFormatter.formatAmount(cart.shippingAmount))
+                : CurrencyFormatter.formatAmount(0),
             isDark,
           ),
           const SizedBox(height: 8),
@@ -983,8 +1089,11 @@ class _CartPageState extends State<CartPage> {
           // Tax
           _buildPriceRow(
             context,
-            'Tax',
-            cart.taxAmount > 0 ? '\$${_formatPrice(cart.taxAmount)}' : '\$0.00',
+            AppLocalizations.of(context)!.cartTax,
+            cart.taxAmount > 0
+                ? (cart.formattedTaxAmount ??
+                    CurrencyFormatter.formatAmount(cart.taxAmount))
+                : CurrencyFormatter.formatAmount(0),
             isDark,
           ),
           const SizedBox(height: 8),
@@ -994,7 +1103,7 @@ class _CartPageState extends State<CartPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Grand Total',
+                AppLocalizations.of(context)!.cartGrandTotal,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
@@ -1003,7 +1112,8 @@ class _CartPageState extends State<CartPage> {
                 ),
               ),
               Text(
-                '\$${_formatPrice(cart.grandTotal)}',
+                cart.formattedGrandTotal ??
+                    CurrencyFormatter.formatAmount(cart.grandTotal),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
@@ -1076,7 +1186,8 @@ class _CartPageState extends State<CartPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '\$${_formatPrice(state.cart.grandTotal)}',
+                    state.cart.formattedGrandTotal ??
+                        CurrencyFormatter.formatAmount(state.cart.grandTotal),
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
@@ -1087,7 +1198,7 @@ class _CartPageState extends State<CartPage> {
                     ),
                   ),
                   Text(
-                    'Amount to be Paid',
+                    AppLocalizations.of(context)!.cartAmountToBePaid,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 14,
@@ -1129,9 +1240,9 @@ class _CartPageState extends State<CartPage> {
                   borderRadius: BorderRadius.circular(54),
                 ),
                 alignment: Alignment.center,
-                child: const Text(
-                  'Pay Now',
-                  style: TextStyle(
+                child: Text(
+                  AppLocalizations.of(context)!.cartPayNow,
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -1157,16 +1268,19 @@ class _CartPageState extends State<CartPage> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: isDark ? AppColors.neutral800 : AppColors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Remove Item', style: AppTextStyles.text4(context)),
+        title: Text(
+          AppLocalizations.of(context)!.cartRemoveItem,
+          style: AppTextStyles.text4(context),
+        ),
         content: Text(
-          'Are you sure you want to remove "${item.name}" from your cart?',
+          AppLocalizations.of(context)!.cartRemoveItemConfirm(item.name),
           style: AppTextStyles.text5(context),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(
-              'Cancel',
+              AppLocalizations.of(context)!.cartCancel,
               style: TextStyle(
                 color: isDark ? AppColors.neutral300 : AppColors.neutral500,
               ),
@@ -1177,9 +1291,9 @@ class _CartPageState extends State<CartPage> {
               Navigator.of(dialogContext).pop();
               context.read<CartBloc>().add(RemoveFromCart(cartItemId: item.id));
             },
-            child: const Text(
-              'Remove',
-              style: TextStyle(color: AppColors.primary500),
+            child: Text(
+              AppLocalizations.of(context)!.cartRemove,
+              style: const TextStyle(color: AppColors.primary500),
             ),
           ),
         ],
@@ -1194,16 +1308,19 @@ class _CartPageState extends State<CartPage> {
       builder: (dialogContext) => AlertDialog(
         backgroundColor: isDark ? AppColors.neutral800 : AppColors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Empty Cart', style: AppTextStyles.text4(context)),
+        title: Text(
+          AppLocalizations.of(context)!.cartEmptyCartTitle,
+          style: AppTextStyles.text4(context),
+        ),
         content: Text(
-          'Are you sure you want to remove all items from your cart?',
+          AppLocalizations.of(context)!.cartEmptyCartConfirm,
           style: AppTextStyles.text5(context),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(
-              'Cancel',
+              AppLocalizations.of(context)!.cartCancel,
               style: TextStyle(
                 color: isDark ? AppColors.neutral300 : AppColors.neutral500,
               ),
@@ -1214,9 +1331,9 @@ class _CartPageState extends State<CartPage> {
               Navigator.of(dialogContext).pop();
               context.read<CartBloc>().add(ClearCart());
             },
-            child: const Text(
-              'Empty Cart',
-              style: TextStyle(color: AppColors.primary500),
+            child: Text(
+              AppLocalizations.of(context)!.cartEmptyCartAction,
+              style: const TextStyle(color: AppColors.primary500),
             ),
           ),
         ],
@@ -1264,21 +1381,13 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
-  /// Format price with commas
-  String _formatPrice(double price) {
-    if (price >= 1000) {
-      final parts = price.toStringAsFixed(2).split('.');
-      final intPart = parts[0];
-      final decPart = parts[1];
-      final buffer = StringBuffer();
-      for (int i = 0; i < intPart.length; i++) {
-        if (i > 0 && (intPart.length - i) % 3 == 0) {
-          buffer.write(',');
-        }
-        buffer.write(intPart[i]);
-      }
-      return '$buffer.$decPart';
+  String _localizedCartMessage(BuildContext context, String message) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (message) {
+      case 'Product added to cart successfully':
+        return l10n.cartAddedToCartSuccess;
+      default:
+        return message;
     }
-    return price.toStringAsFixed(2);
   }
 }

@@ -3,6 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../../core/error/error_mapper.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
@@ -17,6 +20,7 @@ import '../widgets/category_carousel.dart';
 import '../widgets/image_carousel.dart';
 import '../widgets/product_card_large.dart';
 import '../widgets/product_card_small.dart';
+import '../widgets/recently_viewed_products_section.dart';
 import '../widgets/section_header.dart';
 import '../widgets/static_content_widget.dart';
 
@@ -36,8 +40,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -89,7 +92,9 @@ class _HomePageState extends State<HomePage>
       MaterialPageRoute(
         builder: (_) => ProductDetailPage(
           urlKey: product.urlKey,
+          productId: product.numericId?.toString() ?? product.id,
           productName: product.name,
+          productType: product.type,
         ),
       ),
     );
@@ -115,6 +120,7 @@ class _HomePageState extends State<HomePage>
 
   /// Quick-add a product to cart (for simple products only).
   void _addProductToCart(BuildContext context, HomeProduct product) {
+    final l10n = AppLocalizations.of(context)!;
     final productId = int.tryParse(product.id) ?? 0;
     if (productId <= 0) return;
 
@@ -127,12 +133,12 @@ class _HomePageState extends State<HomePage>
     context.read<CartBloc>().add(AddToCart(productId: productId));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${product.name} added to cart'),
+        content: Text(l10n.homeAddedToCartMessage(product.name)),
         backgroundColor: AppColors.successGreen,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
         action: SnackBarAction(
-          label: 'VIEW CART',
+          label: l10n.homeViewCart,
           textColor: AppColors.white,
           onPressed: () => AppNavigator.goCart(context),
         ),
@@ -142,6 +148,7 @@ class _HomePageState extends State<HomePage>
 
   /// Toggle wishlist for a product (add/remove).
   void _toggleWishlist(BuildContext context, HomeProduct product) async {
+    final l10n = AppLocalizations.of(context)!;
     final productId =
         product.numericId ?? int.tryParse(product.id.split('/').last) ?? 0;
     if (productId <= 0) return;
@@ -155,11 +162,11 @@ class _HomePageState extends State<HomePage>
       if (result == null) {
         // Not authenticated
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please login to manage wishlist'),
+          SnackBar(
+            content: Text(l10n.homeLoginToManageWishlist),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
         return;
@@ -167,7 +174,9 @@ class _HomePageState extends State<HomePage>
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result ? 'Added to wishlist' : 'Removed from wishlist'),
+          content: Text(
+            result ? l10n.homeAddedToWishlist : l10n.homeRemovedFromWishlist,
+          ),
           backgroundColor: AppColors.successGreen,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -177,7 +186,9 @@ class _HomePageState extends State<HomePage>
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update wishlist: $e'),
+          content: Text(
+            ErrorMapper.getUserMessage(e, context: 'updating wishlist'),
+          ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -373,6 +384,7 @@ class _HomePageState extends State<HomePage>
   // ──────────────────────────────────────────────────────────────────────
 
   Widget _buildError(BuildContext context, HomeState state) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
@@ -386,13 +398,10 @@ class _HomePageState extends State<HomePage>
               color: isDark ? AppColors.neutral500 : AppColors.neutral400,
             ),
             const SizedBox(height: 16),
-            Text(
-              'Failed to load homepage',
-              style: AppTextStyles.text3(context),
-            ),
+            Text(l10n.homeFailedToLoad, style: AppTextStyles.text3(context)),
             const SizedBox(height: 8),
             Text(
-              state.errorMessage ?? 'Unknown error',
+              state.errorMessage ?? l10n.commonUnknownError,
               style: AppTextStyles.text5(context),
               textAlign: TextAlign.center,
               maxLines: 3,
@@ -405,7 +414,7 @@ class _HomePageState extends State<HomePage>
                 backgroundColor: AppColors.primary500,
                 foregroundColor: AppColors.white,
               ),
-              child: const Text('Retry'),
+              child: Text(l10n.commonRetry),
             ),
           ],
         ),
@@ -429,6 +438,7 @@ class _HomePageState extends State<HomePage>
   // ──────────────────────────────────────────────────────────────────────
 
   Widget _buildContent(BuildContext context, HomeState state) {
+    final l10n = AppLocalizations.of(context)!;
     // ── Build sections dynamically based on sortOrder from API ──
     // The API returns sections in sortOrder, so we render them in that order
     final List<Widget> sections = [];
@@ -446,7 +456,9 @@ class _HomePageState extends State<HomePage>
     // Add Featured Products section with 6-product grid (randomized)
     final allFeaturedProducts = <HomeProduct>[];
     for (final entry in state.productSections.entries) {
-      final tc = state.customizations.where((c) => c.id == entry.key).firstOrNull;
+      final tc = state.customizations
+          .where((c) => c.id == entry.key)
+          .firstOrNull;
       if (tc != null && tc.name.toLowerCase().contains('featured')) {
         allFeaturedProducts.addAll(entry.value);
       }
@@ -455,7 +467,7 @@ class _HomePageState extends State<HomePage>
       sections.add(
         _buildFeaturedProductsGridSection(
           context: context,
-          title: 'Featured Products',
+          title: l10n.homeFeaturedProducts,
           products: allFeaturedProducts,
         ),
       );
@@ -484,7 +496,9 @@ class _HomePageState extends State<HomePage>
           if (products.isNotEmpty) {
             final filters =
                 tc.options['filters'] as Map<String, dynamic>? ?? {};
-            final title = tc.name.isNotEmpty ? tc.name : 'Products';
+            final title = tc.name.isNotEmpty
+                ? tc.name
+                : l10n.homeDefaultProducts;
             sections.add(
               _buildHorizontalProductSection(
                 title: title,
@@ -503,7 +517,7 @@ class _HomePageState extends State<HomePage>
               StaticContentWidget(
                 html: htmlRaw,
                 css: cssRaw,
-                baseUrl: 'https://api-demo.bagisto.com',
+                baseUrl: Uri.parse(bagistoEndpoint).origin,
                 onViewAllPressed: () => _openViewAll(context, tc.name),
               ),
             );
@@ -515,6 +529,12 @@ class _HomePageState extends State<HomePage>
           break;
       }
     }
+
+    sections.add(
+      RecentlyViewedProductsSection(
+        onProductTap: (product) => _openProductDetail(context, product),
+      ),
+    );
 
     // Add Back to Top button
     sections.add(_buildBackToTopButton());
@@ -544,8 +564,8 @@ class _HomePageState extends State<HomePage>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 12, bottom: 24),
         itemCount: sections.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 32),
-        itemBuilder: (_, index) => sections[index],
+        separatorBuilder: (context, index) => const SizedBox(height: 32),
+        itemBuilder: (context, index) => sections[index],
       ),
     );
   }
@@ -574,11 +594,8 @@ class _HomePageState extends State<HomePage>
       children: [
         SectionHeader(
           title: title,
-          onSeeAll: () => _openViewAll(
-            context,
-            title,
-            filters: const {'featured': 1},
-          ),
+          onSeeAll: () =>
+              _openViewAll(context, title, filters: const {'featured': 1}),
         ),
         const SizedBox(height: 16),
         LayoutBuilder(
@@ -596,7 +613,8 @@ class _HomePageState extends State<HomePage>
                 children: displayProducts.map((product) {
                   return BlocBuilder<WishlistCubit, WishlistCubitState>(
                     builder: (context, wishlistState) {
-                      final pid = product.numericId ??
+                      final pid =
+                          product.numericId ??
                           int.tryParse(product.id.split('/').last) ??
                           0;
                       return ProductCardSmall(
@@ -608,8 +626,7 @@ class _HomePageState extends State<HomePage>
                             pid > 0 && wishlistState.isWishlisted(pid),
                         isWishlistProcessing:
                             pid > 0 && wishlistState.isProcessing(pid),
-                        onWishlistTap: () =>
-                            _toggleWishlist(context, product),
+                        onWishlistTap: () => _toggleWishlist(context, product),
                       );
                     },
                   );
@@ -644,17 +661,15 @@ class _HomePageState extends State<HomePage>
             // Figma: 20px padding each side, 12px gap, 2 visible cards + peek
             // Card width = (screenWidth - 40 - 12) / 2
             final cardWidth = (screenWidth - 40 - 12) / 2;
-            // Height = image (square) + spacing + name + price + rating
-            // image + 10 + ~17 (name 14×1.2) + 7 + 18 (price) + 7 + ~22 (rating) = cardWidth + 81
-            // Add 7px safety margin for font rendering = 88
-            final listHeight = cardWidth + 88;
+            // Add a little extra space for price/rating rendering on smaller iOS devices.
+            final listHeight = cardWidth + 96;
             return SizedBox(
               height: listHeight,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: products.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
                   final product = products[index];
                   return BlocBuilder<WishlistCubit, WishlistCubitState>(
@@ -688,6 +703,7 @@ class _HomePageState extends State<HomePage>
 
   /// "Back to Top" pill button.
   Widget _buildBackToTopButton() {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: GestureDetector(
@@ -699,7 +715,7 @@ class _HomePageState extends State<HomePage>
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            'Back to Top',
+            l10n.homeBackToTop,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w600,

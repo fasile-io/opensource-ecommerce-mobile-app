@@ -190,15 +190,7 @@ class ProductCardSmall extends StatelessWidget {
   }
 
   String _priceLabel() {
-    if (product.type == 'configurable' &&
-        product.minimumPrice != null &&
-        product.minimumPrice! > 0) {
-      return '\$${product.minimumPrice!.toStringAsFixed(0)} – \$${product.price.toStringAsFixed(0)}';
-    }
-    if (product.hasDiscount) {
-      return '\$${product.specialPrice!.toStringAsFixed(2)}';
-    }
-    return '\$${product.price.toStringAsFixed(2)}';
+    return product.displayPriceLabel;
   }
 
   Widget _placeholder(bool isDark) {

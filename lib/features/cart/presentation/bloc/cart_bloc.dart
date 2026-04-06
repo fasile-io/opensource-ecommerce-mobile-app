@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../auth/domain/services/auth_storage.dart';
 import '../../data/models/cart_model.dart';
 import '../../data/repository/cart_repository.dart';
@@ -22,9 +22,35 @@ class LoadCart extends CartEvent {}
 class AddToCart extends CartEvent {
   final int productId;
   final int quantity;
-  const AddToCart({required this.productId, this.quantity = 1});
+  final List<String> downloadableLinks;
+  final List<Map<String, int>> groupedItems;
+  final List<Map<String, dynamic>> bundleOptions;
+  final Map<String, dynamic> bookingData;
+  final int? selectedConfigurableOption; // variant ID for configurable
+  final List<Map<String, dynamic>> superAttribute; // [{attrId: optionId}, ...]
+
+  const AddToCart({
+    required this.productId,
+    this.quantity = 1,
+    this.downloadableLinks = const [],
+    this.groupedItems = const [],
+    this.bundleOptions = const [],
+    this.bookingData = const {},
+    this.selectedConfigurableOption,
+    this.superAttribute = const [],
+  });
+
   @override
-  List<Object?> get props => [productId, quantity];
+  List<Object?> get props => [
+    productId,
+    quantity,
+    downloadableLinks,
+    groupedItems,
+    bundleOptions,
+    bookingData,
+    selectedConfigurableOption,
+    superAttribute,
+  ];
 }
 
 /// Update an item's quantity
@@ -258,14 +284,18 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     // This prevents creating a guest session when user is logged in
     final isUserLoggedIn = await AuthStorage.isLoggedIn();
     if (isUserLoggedIn) {
-      debugPrint('[CartBloc] _ensureToken: user is logged in, not creating guest session');
+      debugPrint(
+        '[CartBloc] _ensureToken: user is logged in, not creating guest session',
+      );
       return null;
     }
 
     // If user is authenticated but has no token in state, something is wrong
     // Don't load guest session - let the caller handle this
     if (!state.isGuest) {
-      debugPrint('[CartBloc] _ensureToken: authenticated but no token in state');
+      debugPrint(
+        '[CartBloc] _ensureToken: authenticated but no token in state',
+      );
       return null;
     }
 
@@ -317,35 +347,43 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     // This prevents creating a guest session when user is logged in
     final isUserLoggedIn = await AuthStorage.isLoggedIn();
     if (isUserLoggedIn) {
-      debugPrint('[CartBloc] LoadCart: user is logged in, loading with auth token');
-      
+      debugPrint(
+        '[CartBloc] LoadCart: user is logged in, loading with auth token',
+      );
+
       // Get the auth token and load cart with it
       final authToken = await AuthStorage.getToken();
       if (authToken != null && authToken.isNotEmpty) {
         // Set the guard flag
         _loginInProgress = true;
-        
+
         // Switch token to auth access token
         repository.updateToken(authToken, isGuest: false);
-        emit(state.copyWith(
-          cartToken: authToken,
-          isGuest: false,
-          status: CartStatus.loading,
-        ));
+        emit(
+          state.copyWith(
+            cartToken: authToken,
+            isGuest: false,
+            status: CartStatus.loading,
+          ),
+        );
 
         // Load the user's cart
         try {
           _syncRepoToken();
           final cart = await repository.getCart();
-          emit(state.copyWith(
-            status: CartStatus.loaded,
-            cart: cart,
-            cartId: cart.id > 0 ? cart.id : null,
-            clearError: true,
-          ));
+          emit(
+            state.copyWith(
+              status: CartStatus.loaded,
+              cart: cart,
+              cartId: cart.id > 0 ? cart.id : null,
+              clearError: true,
+            ),
+          );
         } catch (e) {
           debugPrint('[CartBloc] LoadCart error (logged in user): $e');
-          emit(state.copyWith(status: CartStatus.loaded, cart: CartModel.empty));
+          emit(
+            state.copyWith(status: CartStatus.loaded, cart: CartModel.empty),
+          );
         } finally {
           _loginInProgress = false;
         }
@@ -355,8 +393,11 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
     // If user is authenticated but has no token, don't fall back to guest
     // This prevents the guest session from being loaded when user is logged in
-    if (!state.isGuest && (state.cartToken == null || state.cartToken!.isEmpty)) {
-      debugPrint('[CartBloc] LoadCart: authenticated user but no token, waiting for login to complete');
+    if (!state.isGuest &&
+        (state.cartToken == null || state.cartToken!.isEmpty)) {
+      debugPrint(
+        '[CartBloc] LoadCart: authenticated user but no token, waiting for login to complete',
+      );
       return;
     }
 
@@ -444,6 +485,12 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final cart = await repository.addToCart(
         productId: event.productId,
         quantity: event.quantity,
+        downloadableLinks: event.downloadableLinks,
+        groupedItems: event.groupedItems,
+        bundleOptions: event.bundleOptions,
+        bookingData: event.bookingData,
+        selectedConfigurableOption: event.selectedConfigurableOption,
+        superAttribute: event.superAttribute,
       );
 
       emit(
@@ -458,13 +505,11 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       );
     } catch (e) {
       debugPrint('[CartBloc] AddToCart error: $e');
-      final errorMsg = _extractErrorMessage(e);
-      emit(
-        state.copyWith(
-          isAddingToCart: false,
-          errorMessage: errorMsg,
-        ),
+      final errorMsg = ErrorMapper.getUserMessage(
+        e,
+        context: 'adding the product to cart',
       );
+      emit(state.copyWith(isAddingToCart: false, errorMessage: errorMsg));
     }
   }
 
@@ -475,14 +520,16 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     emit(state.copyWith(updatingItemId: event.cartItemId));
     try {
       _syncRepoToken();
-      final cart = await repository.updateCartItem(
+      await repository.updateCartItem(
         cartItemId: event.cartItemId,
         quantity: event.quantity,
       );
+      final freshCart = await repository.getCart();
       emit(
         state.copyWith(
           status: CartStatus.loaded,
-          cart: cart,
+          cart: freshCart,
+          cartId: freshCart.id > 0 ? freshCart.id : state.cartId,
           clearUpdatingItem: true,
           clearError: true,
         ),
@@ -492,7 +539,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(
         state.copyWith(
           clearUpdatingItem: true,
-          errorMessage: 'Failed to update quantity',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'updating quantity',
+          ),
         ),
       );
     }
@@ -505,12 +555,13 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     emit(state.copyWith(updatingItemId: event.cartItemId));
     try {
       _syncRepoToken();
-      final cart = await repository.removeCartItem(
+      await repository.removeCartItem(
         cartItemId: event.cartItemId,
       );
+      final freshCart = await repository.getCart();
 
       // If cart is now empty and we're a guest, reset the guest session
-      if (cart.itemsQty == 0 && state.isGuest) {
+      if (freshCart.itemsQty == 0 && state.isGuest) {
         await _clearGuestSession();
         emit(
           const CartState(
@@ -526,7 +577,8 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(
         state.copyWith(
           status: CartStatus.loaded,
-          cart: cart,
+          cart: freshCart,
+          cartId: freshCart.id > 0 ? freshCart.id : state.cartId,
           clearUpdatingItem: true,
           successMessage: 'Item removed from cart',
           clearError: true,
@@ -537,7 +589,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(
         state.copyWith(
           clearUpdatingItem: true,
-          errorMessage: 'Failed to remove item',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'removing item from cart',
+          ),
         ),
       );
     }
@@ -737,7 +792,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(
         state.copyWith(
           isApplyingCoupon: false,
-          errorMessage: 'Failed to apply coupon',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'applying coupon',
+          ),
         ),
       );
     }
@@ -765,7 +823,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(
         state.copyWith(
           isApplyingCoupon: false,
-          errorMessage: 'Failed to remove coupon',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'removing coupon',
+          ),
         ),
       );
     }
@@ -773,18 +834,5 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
   void _onClearCartMessage(ClearCartMessage event, Emitter<CartState> emit) {
     emit(state.copyWith(clearMessage: true, clearError: true));
-  }
-
-  /// Extract readable error message from exceptions
-  String _extractErrorMessage(Object exception) {
-    if (exception is OperationException) {
-      if (exception.graphqlErrors.isNotEmpty) {
-        return exception.graphqlErrors.first.message;
-      }
-      if (exception.linkException != null) {
-        return 'Network error. Please check your connection.';
-      }
-    }
-    return 'Failed to add product to cart. Please try again.';
   }
 }

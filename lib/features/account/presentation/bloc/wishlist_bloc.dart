@@ -73,6 +73,8 @@ class WishlistState extends Equatable {
   final String? errorMessage;
   final String? errorUrlKey;
   final String? errorProductName;
+  final String? errorProductType;
+  final int? errorProductId;
 
   /// Track which item IDs are currently processing (remove/move to cart)
   final Set<String> processingIds;
@@ -88,6 +90,8 @@ class WishlistState extends Equatable {
     this.errorMessage,
     this.errorUrlKey,
     this.errorProductName,
+    this.errorProductType,
+    this.errorProductId,
     this.processingIds = const {},
   });
 
@@ -102,6 +106,8 @@ class WishlistState extends Equatable {
     String? errorMessage,
     String? errorUrlKey,
     String? errorProductName,
+    String? errorProductType,
+    int? errorProductId,
     Set<String>? processingIds,
   }) {
     return WishlistState(
@@ -115,6 +121,8 @@ class WishlistState extends Equatable {
       errorMessage: errorMessage,
       errorUrlKey: errorUrlKey ?? this.errorUrlKey,
       errorProductName: errorProductName ?? this.errorProductName,
+      errorProductType: errorProductType ?? this.errorProductType,
+      errorProductId: errorProductId ?? this.errorProductId,
       processingIds: processingIds ?? this.processingIds,
     );
   }
@@ -131,6 +139,8 @@ class WishlistState extends Equatable {
     errorMessage,
     errorUrlKey,
     errorProductName,
+    errorProductType,
+    errorProductId,
     processingIds,
   ];
 }
@@ -139,12 +149,11 @@ class WishlistState extends Equatable {
 
 class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
   final AccountRepository repository;
-  final WishlistCubit? wishlistCubit; // Optional reference to global wishlist cubit
+  final WishlistCubit?
+  wishlistCubit; // Optional reference to global wishlist cubit
 
-  WishlistBloc({
-    required this.repository,
-    this.wishlistCubit,
-  }) : super(const WishlistState()) {
+  WishlistBloc({required this.repository, this.wishlistCubit})
+    : super(const WishlistState()) {
     on<LoadWishlist>(_onLoad);
     on<LoadMoreWishlist>(_onLoadMore);
     on<RemoveWishlistItem>(_onRemove);
@@ -296,7 +305,10 @@ class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
 
       // Also sync with global WishlistCubit if available
       if (wishlistCubit != null) {
-        wishlistCubit!.removeProductFromWishlist(event.numericId);
+        final productId = item.productNumericId;
+        if (productId != null) {
+          wishlistCubit!.removeProductFromWishlist(productId);
+        }
         debugPrint('❤️ WishlistBloc: synced move-to-cart with WishlistCubit');
       }
 
@@ -316,11 +328,15 @@ class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
 
       String? errorUrlKey;
       String? errorProductName;
+      String? errorProductType;
+      int? errorProductId;
 
       // If the product is configurable, we should provide the urlKey for navigation
       if (item.type == 'configurable') {
         errorUrlKey = item.urlKey;
         errorProductName = item.name;
+        errorProductType = item.type;
+        errorProductId = item.productNumericId;
       }
 
       emit(
@@ -331,6 +347,8 @@ class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
               : 'Failed to add to cart. Please try again.',
           errorUrlKey: errorUrlKey,
           errorProductName: errorProductName,
+          errorProductType: errorProductType,
+          errorProductId: errorProductId,
         ),
       );
     }
@@ -360,6 +378,8 @@ class WishlistBloc extends Bloc<WishlistEvent, WishlistState> {
         errorMessage: null,
         errorUrlKey: null,
         errorProductName: null,
+        errorProductType: null,
+        errorProductId: null,
       ),
     );
   }

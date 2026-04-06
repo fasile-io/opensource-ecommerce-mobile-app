@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../category/presentation/pages/category_page.dart';
 import '../../../cart/presentation/pages/cart_page.dart';
 import '../../../cart/presentation/bloc/cart_bloc.dart';
@@ -90,6 +91,8 @@ class MainShellState extends State<MainShell> {
   }
 
   Widget _buildBottomNav(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.neutral800 : AppColors.neutral50,
@@ -110,26 +113,26 @@ class MainShellState extends State<MainShell> {
                 index: 0,
                 icon: Icons.home_outlined,
                 activeIcon: Icons.home,
-                label: 'Home',
+                label: l10n.mainTabHome,
               ),
               _buildNavItem(
                 index: 1,
                 icon: Icons.grid_view_outlined,
                 activeIcon: Icons.grid_view,
-                label: 'Categories',
+                label: l10n.mainTabCategories,
               ),
               _buildNavItemWithBadge(
                 index: 2,
                 icon: Icons.shopping_cart_outlined,
                 activeIcon: Icons.shopping_cart,
-                label: 'Cart',
+                label: l10n.mainTabCart,
                 badgeCount: context.watch<CartBloc>().state.itemCount,
               ),
               _buildNavItem(
                 index: 3,
                 icon: Icons.person_outline,
                 activeIcon: Icons.person,
-                label: 'Account',
+                label: l10n.mainTabAccount,
               ),
             ],
           ),

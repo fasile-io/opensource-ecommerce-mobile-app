@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 
@@ -81,15 +82,15 @@ class OrdersState extends Equatable {
 
   @override
   List<Object?> get props => [
-        status,
-        orders,
-        totalCount,
-        hasNextPage,
-        endCursor,
-        isLoadingMore,
-        errorMessage,
-        statusFilter,
-      ];
+    status,
+    orders,
+    totalCount,
+    hasNextPage,
+    endCursor,
+    isLoadingMore,
+    errorMessage,
+    statusFilter,
+  ];
 }
 
 // ─── BLOC ───
@@ -103,14 +104,13 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     on<ClearOrderMessage>(_onClearMessage);
   }
 
-  Future<void> _onLoad(
-    LoadOrders event,
-    Emitter<OrdersState> emit,
-  ) async {
-    emit(state.copyWith(
-      status: OrdersStatus.loading,
-      statusFilter: event.statusFilter,
-    ));
+  Future<void> _onLoad(LoadOrders event, Emitter<OrdersState> emit) async {
+    emit(
+      state.copyWith(
+        status: OrdersStatus.loading,
+        statusFilter: event.statusFilter,
+      ),
+    );
 
     try {
       final result = await repository.getCustomerOrders(
@@ -118,19 +118,26 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
         status: event.statusFilter,
       );
 
-      emit(state.copyWith(
-        status: OrdersStatus.loaded,
-        orders: result.orders,
-        totalCount: result.totalCount,
-        hasNextPage: result.hasNextPage,
-        endCursor: result.endCursor,
-      ));
+      emit(
+        state.copyWith(
+          status: OrdersStatus.loaded,
+          orders: result.orders,
+          totalCount: result.totalCount,
+          hasNextPage: result.hasNextPage,
+          endCursor: result.endCursor,
+        ),
+      );
     } catch (e) {
       debugPrint('❌ OrdersBloc._onLoad error: $e');
-      emit(state.copyWith(
-        status: OrdersStatus.error,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          status: OrdersStatus.error,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading orders',
+          ),
+        ),
+      );
     }
   }
 
@@ -149,27 +156,31 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
         status: state.statusFilter,
       );
 
-      emit(state.copyWith(
-        status: OrdersStatus.loaded,
-        orders: [...state.orders, ...result.orders],
-        totalCount: result.totalCount,
-        hasNextPage: result.hasNextPage,
-        endCursor: result.endCursor,
-        isLoadingMore: false,
-      ));
+      emit(
+        state.copyWith(
+          status: OrdersStatus.loaded,
+          orders: [...state.orders, ...result.orders],
+          totalCount: result.totalCount,
+          hasNextPage: result.hasNextPage,
+          endCursor: result.endCursor,
+          isLoadingMore: false,
+        ),
+      );
     } catch (e) {
       debugPrint('❌ OrdersBloc._onLoadMore error: $e');
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading more orders',
+          ),
+        ),
+      );
     }
   }
 
-  void _onClearMessage(
-    ClearOrderMessage event,
-    Emitter<OrdersState> emit,
-  ) {
+  void _onClearMessage(ClearOrderMessage event, Emitter<OrdersState> emit) {
     emit(state.copyWith(errorMessage: null));
   }
 }

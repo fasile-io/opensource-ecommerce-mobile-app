@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// Bottom Sort/Filter bar matching Figma 63:2666
 ///
@@ -222,6 +223,7 @@ class BottomSortFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Material(
       color: isDark ? AppColors.neutral800 : AppColors.neutral50,
@@ -259,7 +261,7 @@ class BottomSortFilterBar extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Sort',
+                              l10n.categorySort,
                               style: TextStyle(
                                 fontFamily: 'Roboto',
                                 fontSize: 14,
@@ -317,7 +319,7 @@ class BottomSortFilterBar extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Filter',
+                              l10n.categoryFilter,
                               style: TextStyle(
                                 fontFamily: 'Roboto',
                                 fontSize: 14,

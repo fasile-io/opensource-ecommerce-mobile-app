@@ -2,10 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../product/presentation/pages/product_detail_page.dart';
 import '../../data/models/account_models.dart';
 import '../bloc/wishlist_bloc.dart';
 import '../../../cart/presentation/bloc/cart_bloc.dart';
+
+String _localizedWishlistMessage(BuildContext context, String message) {
+  final l10n = AppLocalizations.of(context)!;
+  switch (message) {
+    case 'Item removed from wishlist':
+      return l10n.wishlistItemRemoved;
+    default:
+      return message;
+  }
+}
 
 /// Wishlist page matching Figma node 245:5225
 /// Design: Back arrow + "Wishlist" title, item count, list of wishlist items
@@ -16,6 +27,7 @@ class WishlistPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
       appBar: AppBar(
@@ -25,10 +37,10 @@ class WishlistPage extends StatelessWidget {
         leading: AppBackButton(isIosStyle: false),
         leadingWidth: 60,
         title: Text(
-          'Wishlist',
-          style: AppTextStyles.text4(context).copyWith(
-            color: isDark ? AppColors.neutral100 : AppColors.black,
-          ),
+          l10n.accountWishlist,
+          style: AppTextStyles.text4(
+            context,
+          ).copyWith(color: isDark ? AppColors.neutral100 : AppColors.black),
         ),
         centerTitle: false,
       ),
@@ -36,11 +48,13 @@ class WishlistPage extends StatelessWidget {
         listener: (context, state) {
           // Show snackbar for success/error messages
           if (state.successMessage != null) {
+            final message =
+                _localizedWishlistMessage(context, state.successMessage!);
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: Text(state.successMessage!),
+                  content: Text(message),
                   backgroundColor: AppColors.success700,
                   behavior: SnackBarBehavior.floating,
                   duration: const Duration(seconds: 2),
@@ -68,7 +82,9 @@ class WishlistPage extends StatelessWidget {
                 MaterialPageRoute(
                   builder: (_) => ProductDetailPage(
                     urlKey: state.errorUrlKey!,
+                    productId: state.errorProductId?.toString(),
                     productName: state.errorProductName,
+                    productType: state.errorProductType,
                   ),
                 ),
               );
@@ -99,7 +115,12 @@ class WishlistPage extends StatelessWidget {
     );
   }
 
-  Widget _buildErrorState(BuildContext context, WishlistState state, bool isDark) {
+  Widget _buildErrorState(
+    BuildContext context,
+    WishlistState state,
+    bool isDark,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -109,11 +130,9 @@ class WishlistPage extends StatelessWidget {
             Icon(Icons.error_outline, size: 64, color: AppColors.neutral400),
             const SizedBox(height: 16),
             Text(
-              state.errorMessage ?? 'Something went wrong',
+              state.errorMessage ?? l10n.categorySomethingWentWrong,
               textAlign: TextAlign.center,
-              style: AppTextStyles.text5(
-                context,
-              ).copyWith(
+              style: AppTextStyles.text5(context).copyWith(
                 color: isDark ? AppColors.neutral400 : AppColors.neutral500,
               ),
             ),
@@ -123,7 +142,7 @@ class WishlistPage extends StatelessWidget {
                 context.read<WishlistBloc>().add(const LoadWishlist());
               },
               child: Text(
-                'Try Again',
+                l10n.accountTryAgain,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -139,6 +158,7 @@ class WishlistPage extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -152,16 +172,14 @@ class WishlistPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Your wishlist is empty',
-              style: AppTextStyles.text4(
-                context,
-              ).copyWith(
+              l10n.accountYourWishlistEmpty,
+              style: AppTextStyles.text4(context).copyWith(
                 color: isDark ? AppColors.neutral100 : AppColors.neutral900,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Browse products and add them to your wishlist',
+              l10n.accountWishlistEmptyDescription,
               textAlign: TextAlign.center,
               style: AppTextStyles.text5(
                 context,
@@ -209,11 +227,21 @@ class _WishlistList extends StatefulWidget {
 
 class _WishlistListState extends State<_WishlistList> {
   final ScrollController _scrollController = ScrollController();
+  final Map<String, int> _quantities = <String, int>{};
 
   @override
   void initState() {
     super.initState();
+    _syncQuantities(widget.items);
     _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(covariant _WishlistList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.items != widget.items) {
+      _syncQuantities(widget.items);
+    }
   }
 
   @override
@@ -221,6 +249,71 @@ class _WishlistListState extends State<_WishlistList> {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _syncQuantities(List<WishlistItem> items) {
+    final nextIds = items.map((item) => item.id).whereType<String>().toSet();
+    _quantities.removeWhere((id, _) => !nextIds.contains(id));
+
+    for (final item in items) {
+      final id = item.id;
+      if (id == null) continue;
+      _quantities[id] = (_quantities[id] ?? item.quantity).clamp(1, 9999);
+    }
+  }
+
+  void _handleQuantityChanged(WishlistItem item, int quantity) {
+    final id = item.id;
+    if (id == null) return;
+
+    final safeQuantity = quantity.clamp(1, 9999);
+    setState(() {
+      _quantities[id] = safeQuantity;
+    });
+
+    context.read<WishlistBloc>().add(
+      UpdateWishlistItemQuantity(id: id, quantity: safeQuantity),
+    );
+  }
+
+  void _handleAddToCart(BuildContext context, WishlistItem item, int quantity) {
+    if (_requiresProductDetails(item)) {
+      if (item.urlKey == null || item.urlKey!.isEmpty) return;
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProductDetailPage(
+            urlKey: item.urlKey!,
+            productId: item.productNumericId?.toString(),
+            productName: item.name,
+            productType: item.type,
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (item.numericId == null) return;
+
+    context.read<WishlistBloc>().add(
+      MoveWishlistItemToCart(
+        numericId: item.numericId!,
+        quantity: quantity,
+      ),
+    );
+  }
+
+  bool _requiresProductDetails(WishlistItem item) {
+    switch ((item.type ?? '').toLowerCase()) {
+      case 'configurable':
+      case 'bundle':
+      case 'grouped':
+      case 'downloadable':
+      case 'booking':
+        return true;
+      default:
+        return false;
+    }
   }
 
   void _onScroll() {
@@ -234,6 +327,8 @@ class _WishlistListState extends State<_WishlistList> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -243,12 +338,14 @@ class _WishlistListState extends State<_WishlistList> {
           Padding(
             padding: const EdgeInsets.only(top: 4, bottom: 0),
             child: Text(
-              '${widget.totalCount} ${widget.totalCount == 1 ? 'Item' : 'Items'}',
+              '${widget.totalCount} ${widget.totalCount == 1 ? l10n.accountItemSingular : l10n.accountItemPlural}',
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
-                color: widget.isDark ? AppColors.neutral200 : AppColors.neutral900,
+                color: widget.isDark
+                    ? AppColors.neutral200
+                    : AppColors.neutral900,
               ),
             ),
           ),
@@ -272,30 +369,20 @@ class _WishlistListState extends State<_WishlistList> {
                 }
 
                 final item = widget.items[index];
+                final quantity = item.id != null
+                    ? (_quantities[item.id!] ?? item.quantity)
+                    : item.quantity;
                 final isProcessing = widget.processingIds.contains(
                   item.id ?? '',
                 );
                 return _WishlistItemCard(
+                  key: ValueKey(item.id ?? item.numericId ?? index),
                   item: item,
+                  quantity: quantity,
                   isProcessing: isProcessing,
                   isDark: widget.isDark,
-                  onQuantityChanged: (qty) {
-                    if (item.id != null) {
-                      context.read<WishlistBloc>().add(
-                        UpdateWishlistItemQuantity(id: item.id!, quantity: qty),
-                      );
-                    }
-                  },
-                  onAddToCart: () {
-                    if (item.numericId != null) {
-                      context.read<WishlistBloc>().add(
-                        MoveWishlistItemToCart(
-                          numericId: item.numericId!,
-                          quantity: item.quantity,
-                        ),
-                      );
-                    }
-                  },
+                  onQuantityChanged: (qty) => _handleQuantityChanged(item, qty),
+                  onAddToCart: () => _handleAddToCart(context, item, quantity),
                   onRemove: () {
                     if (item.id != null) {
                       context.read<WishlistBloc>().add(
@@ -311,11 +398,13 @@ class _WishlistListState extends State<_WishlistList> {
       ),
     );
   }
+
 }
 
 /// Single wishlist item card matching Figma design
 class _WishlistItemCard extends StatelessWidget {
   final WishlistItem item;
+  final int quantity;
   final bool isProcessing;
   final bool isDark;
   final ValueChanged<int> onQuantityChanged;
@@ -323,7 +412,9 @@ class _WishlistItemCard extends StatelessWidget {
   final VoidCallback onRemove;
 
   const _WishlistItemCard({
+    super.key,
     required this.item,
+    required this.quantity,
     required this.isProcessing,
     required this.isDark,
     required this.onQuantityChanged,
@@ -356,7 +447,9 @@ class _WishlistItemCard extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => ProductDetailPage(
                         urlKey: item.urlKey!,
+                        productId: item.productNumericId?.toString(),
                         productName: item.name,
+                        productType: item.type,
                       ),
                     ),
                   );
@@ -373,19 +466,27 @@ class _WishlistItemCard extends StatelessWidget {
                           item.baseImageUrl!,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => Container(
-                            color: isDark ? AppColors.neutral800 : AppColors.neutral100,
+                            color: isDark
+                                ? AppColors.neutral800
+                                : AppColors.neutral100,
                             child: Icon(
                               Icons.image_outlined,
-                              color: isDark ? AppColors.neutral600 : AppColors.neutral400,
+                              color: isDark
+                                  ? AppColors.neutral600
+                                  : AppColors.neutral400,
                               size: 32,
                             ),
                           ),
                         )
                       : Container(
-                          color: isDark ? AppColors.neutral800 : AppColors.neutral100,
+                          color: isDark
+                              ? AppColors.neutral800
+                              : AppColors.neutral100,
                           child: Icon(
                             Icons.image_outlined,
-                            color: isDark ? AppColors.neutral600 : AppColors.neutral400,
+                            color: isDark
+                                ? AppColors.neutral600
+                                : AppColors.neutral400,
                             size: 32,
                           ),
                         ),
@@ -406,7 +507,9 @@ class _WishlistItemCard extends StatelessWidget {
                           MaterialPageRoute(
                             builder: (_) => ProductDetailPage(
                               urlKey: item.urlKey!,
+                              productId: item.productNumericId?.toString(),
                               productName: item.name,
+                              productType: item.type,
                             ),
                           ),
                         );
@@ -418,7 +521,9 @@ class _WishlistItemCard extends StatelessWidget {
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
-                        color: isDark ? AppColors.neutral200 : AppColors.neutral900,
+                        color: isDark
+                            ? AppColors.neutral200
+                            : AppColors.neutral900,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -427,12 +532,14 @@ class _WishlistItemCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   // Price — "Starting at $336.00"
                   Text(
-                    _buildPriceText(),
+                    _buildPriceText(context),
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
                       fontSize: 14,
-                      color: isDark ? AppColors.neutral200 : AppColors.neutral900,
+                      color: isDark
+                          ? AppColors.neutral200
+                          : AppColors.neutral900,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -441,7 +548,7 @@ class _WishlistItemCard extends StatelessWidget {
                     children: [
                       // Quantity stepper
                       _QuantityStepper(
-                        quantity: item.quantity,
+                        quantity: quantity,
                         onChanged: onQuantityChanged,
                         isDark: isDark,
                       ),
@@ -457,8 +564,8 @@ class _WishlistItemCard extends StatelessWidget {
                   // Remove link — blue text
                   GestureDetector(
                     onTap: isProcessing ? null : onRemove,
-                    child: const Text(
-                      'Remove',
+                    child: Text(
+                      AppLocalizations.of(context)!.cartRemove,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w500,
@@ -476,11 +583,12 @@ class _WishlistItemCard extends StatelessWidget {
     );
   }
 
-  String _buildPriceText() {
+  String _buildPriceText(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (item.specialPrice != null && item.specialPrice! > 0) {
-      return 'Starting at ${item.formattedSpecialPrice}';
+      return l10n.accountStartingAt(item.formattedSpecialPrice ?? '');
     }
-    return 'Starting at ${item.formattedPrice}';
+    return l10n.accountStartingAt(item.formattedPrice);
   }
 }
 
@@ -501,7 +609,9 @@ class _QuantityStepper extends StatelessWidget {
     return Container(
       height: 36,
       decoration: BoxDecoration(
-        border: Border.all(color: isDark ? AppColors.neutral700 : AppColors.neutral200),
+        border: Border.all(
+          color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+        ),
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -509,13 +619,12 @@ class _QuantityStepper extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Minus button
-          GestureDetector(
-            onTap: () {
-              if (quantity > 1) onChanged(quantity - 1);
-            },
+          InkWell(
+            onTap: quantity > 1 ? () => onChanged(quantity - 1) : null,
+            borderRadius: BorderRadius.circular(8),
             child: SizedBox(
-              width: 24,
-              height: 24,
+              width: 28,
+              height: 28,
               child: Icon(
                 Icons.remove,
                 size: 16,
@@ -542,11 +651,12 @@ class _QuantityStepper extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           // Plus button
-          GestureDetector(
+          InkWell(
             onTap: () => onChanged(quantity + 1),
+            borderRadius: BorderRadius.circular(8),
             child: SizedBox(
-              width: 24,
-              height: 24,
+              width: 28,
+              height: 28,
               child: Icon(
                 Icons.add,
                 size: 16,
@@ -565,25 +675,26 @@ class _AddToCartButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool isDark;
 
-  const _AddToCartButton({
-    this.onPressed,
-    required this.isDark,
-  });
+  const _AddToCartButton({this.onPressed, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return GestureDetector(
       onTap: onPressed,
       child: Container(
         height: 36,
         width: 108,
         decoration: BoxDecoration(
-          border: Border.all(color: isDark ? AppColors.neutral700 : AppColors.neutral200),
+          border: Border.all(
+            color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+          ),
           borderRadius: BorderRadius.circular(10),
         ),
         alignment: Alignment.center,
         child: Text(
-          'Add to Cart',
+          l10n.accountMoveToCart,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w700,

@@ -126,13 +126,17 @@ class CategoryRepository {
     if (after != null) variables['after'] = after;
     if (before != null) variables['before'] = before;
 
-    debugPrint('[CategoryRepo] getFilterProducts variables=$variables, useCacheFirst=$useCacheFirst');
+    debugPrint(
+      '[CategoryRepo] getFilterProducts variables=$variables, useCacheFirst=$useCacheFirst',
+    );
 
     final result = await client.query(
       QueryOptions(
         document: gql(ProductQueries.getFilterProducts),
         variables: variables,
-        fetchPolicy: useCacheFirst ? FetchPolicy.cacheFirst : FetchPolicy.cacheAndNetwork,
+        fetchPolicy: useCacheFirst
+            ? FetchPolicy.cacheFirst
+            : FetchPolicy.cacheAndNetwork,
       ),
     );
 
@@ -149,10 +153,41 @@ class CategoryRepository {
 
   /// Fetch single product by URL key
   /// Maps to: GET_PRODUCT_BY_URL_KEY from nextjs-commerce
-  Future<ProductModel> getProductByUrlKey(String urlKey) async {
+  Future<ProductModel> getProductByUrlKey(
+    String urlKey, {
+    String? productType,
+  }) async {
+    final normalizedType = (productType ?? '').toLowerCase().trim();
+    if (normalizedType == 'booking') {
+      final bookingType = await _resolveBookingTypeByUrlKey(urlKey);
+      final query = ProductQueries.getBookingProductByUrlKeyForType(
+        bookingType,
+      );
+
+      final result = await client.query(
+        QueryOptions(
+          document: gql(query),
+          variables: {'urlKey': urlKey},
+          fetchPolicy: FetchPolicy.cacheAndNetwork,
+        ),
+      );
+
+      if (result.hasException) {
+        throw result.exception!;
+      }
+
+      final product = ProductModel.fromJson(
+        result.data!['product'] as Map<String, dynamic>,
+      );
+      _logBookingAvailability(product, source: 'urlKey:$urlKey');
+      return product;
+    }
+
+    final query = ProductQueries.getProductByUrlKeyByType(productType);
+
     final result = await client.query(
       QueryOptions(
-        document: gql(ProductQueries.getProductByUrlKey),
+        document: gql(query),
         variables: {'urlKey': urlKey},
         fetchPolicy: FetchPolicy.cacheAndNetwork,
       ),
@@ -162,9 +197,183 @@ class CategoryRepository {
       throw result.exception!;
     }
 
-    return ProductModel.fromJson(
+    final product = ProductModel.fromJson(
       result.data!['product'] as Map<String, dynamic>,
     );
+    _logBookingAvailability(product, source: 'urlKey:$urlKey');
+    return product;
+  }
+
+  /// Fetch single product by ID
+  /// Maps to: GET_PRODUCT_BY_ID from nextjs-commerce
+  Future<ProductModel> getProductById(
+    String productId, {
+    String? productType,
+  }) async {
+    final normalizedType = (productType ?? '').toLowerCase().trim();
+    if (normalizedType == 'booking') {
+      final bookingType = await _resolveBookingTypeById(productId);
+      final query = ProductQueries.getBookingProductByIdForType(bookingType);
+
+      final result = await client.query(
+        QueryOptions(
+          document: gql(query),
+          variables: {'id': productId},
+          fetchPolicy: FetchPolicy.cacheAndNetwork,
+        ),
+      );
+
+      if (result.hasException) {
+        throw result.exception!;
+      }
+
+      final product = ProductModel.fromJson(
+        result.data!['product'] as Map<String, dynamic>,
+      );
+      _logBookingAvailability(product, source: 'id:$productId');
+      return product;
+    }
+
+    final query = ProductQueries.getProductById;
+
+    final result = await client.query(
+      QueryOptions(
+        document: gql(query),
+        variables: {'id': productId},
+        fetchPolicy: FetchPolicy.cacheAndNetwork,
+      ),
+    );
+
+    if (result.hasException) {
+      throw result.exception!;
+    }
+
+    final product = ProductModel.fromJson(
+      result.data!['product'] as Map<String, dynamic>,
+    );
+    _logBookingAvailability(product, source: 'id:$productId');
+    return product;
+  }
+
+  Future<List<BookingSlotOption>> getBookingSlots({
+    required BookingProductData booking,
+    required String date,
+    String? rentingType,
+  }) async {
+    final type = (booking.type ?? '').toLowerCase().trim();
+    final normalizedRentingType = (rentingType ?? '').toLowerCase().trim();
+    final bookingId = _resolveBookingSlotId(booking);
+
+    if (bookingId <= 0) {
+      throw Exception('Missing booking slot id for $type product');
+    }
+
+    final isRentalHourly =
+        type == 'rental' && normalizedRentingType == 'hourly';
+    final result = await client.query(
+      QueryOptions(
+        document: gql(
+          isRentalHourly
+              ? ProductQueries.getBookingRentalHourlySlots
+              : ProductQueries.getBookingSlots,
+        ),
+        variables: {'id': bookingId, 'date': date},
+        fetchPolicy: FetchPolicy.noCache,
+      ),
+    );
+
+    if (result.hasException) {
+      throw result.exception!;
+    }
+
+    final slots = result.data?['bookingSlots'] as List<dynamic>? ?? const [];
+
+    if (isRentalHourly) {
+      return slots
+          .whereType<Map<String, dynamic>>()
+          .expand(BookingSlotOption.fromRentalSummaryJson)
+          .where((slot) => slot.label.trim().isNotEmpty)
+          .toList();
+    }
+
+    return slots
+        .whereType<Map<String, dynamic>>()
+        .map(BookingSlotOption.fromStandardJson)
+        .where((slot) => slot.label.trim().isNotEmpty)
+        .toList();
+  }
+
+  Future<String> _resolveBookingTypeByUrlKey(String urlKey) async {
+    final result = await client.query(
+      QueryOptions(
+        document: gql(ProductQueries.getBookingProductTypeByUrlKey),
+        variables: {'urlKey': urlKey},
+        fetchPolicy: FetchPolicy.cacheAndNetwork,
+      ),
+    );
+
+    if (result.hasException) {
+      throw result.exception!;
+    }
+
+    final product = result.data?['product'] as Map<String, dynamic>?;
+    final edges = product?['bookingProducts']?['edges'] as List<dynamic>? ?? [];
+    if (edges.isEmpty) return 'default';
+
+    final node = edges.first['node'] as Map<String, dynamic>?;
+    final bookingType = node?['type']?.toString().trim();
+    if (bookingType == null || bookingType.isEmpty) return 'default';
+    return bookingType;
+  }
+
+  Future<String> _resolveBookingTypeById(String productId) async {
+    final result = await client.query(
+      QueryOptions(
+        document: gql(ProductQueries.getBookingProductTypeById),
+        variables: {'id': productId},
+        fetchPolicy: FetchPolicy.cacheAndNetwork,
+      ),
+    );
+
+    if (result.hasException) {
+      throw result.exception!;
+    }
+
+    final product = result.data?['product'] as Map<String, dynamic>?;
+    final edges = product?['bookingProducts']?['edges'] as List<dynamic>? ?? [];
+    if (edges.isEmpty) return 'default';
+
+    final node = edges.first['node'] as Map<String, dynamic>?;
+    final bookingType = node?['type']?.toString().trim();
+    if (bookingType == null || bookingType.isEmpty) return 'default';
+    return bookingType;
+  }
+
+  int _resolveBookingSlotId(BookingProductData booking) {
+    final type = (booking.type ?? '').toLowerCase().trim();
+
+    switch (type) {
+      case 'appointment':
+      case 'rental':
+      case 'table':
+        return booking.activeSlot?.resolvedBookingId ?? 0;
+      case 'default':
+      default:
+        return booking.numericId ?? int.tryParse(booking.id) ?? 0;
+    }
+  }
+
+  void _logBookingAvailability(ProductModel product, {required String source}) {
+    if (!product.isBooking || product.bookingProducts.isEmpty) return;
+
+    for (final booking in product.bookingProducts) {
+      debugPrint(
+        '[CategoryRepo] booking availability ($source) '
+        'type=${booking.type} '
+        'availableFrom=${booking.availableFrom} '
+        'availableTo=${booking.availableTo}',
+      );
+    }
   }
 
   /// Fetch filter attribute options (legacy – single attribute by ID)

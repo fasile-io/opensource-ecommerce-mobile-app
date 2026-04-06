@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/home_models.dart';
 import '../../data/repository/home_repository.dart';
 
@@ -105,21 +106,32 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       try {
         return await _doLoad(emit);
       } catch (e) {
-        final isNetworkError = e.toString().contains('Network') ||
-            e.toString().contains('TimeoutException') ||
-            e.toString().contains('No stream event') ||
-            e.toString().contains('SocketException') ||
-            e.toString().contains('linkException');
-        if (isNetworkError && attempt < maxAttempts) {
-          debugPrint('[HomeBloc] network error (attempt $attempt/$maxAttempts, retrying): $e');
+        if (ErrorMapper.isNetworkError(e) && attempt < maxAttempts) {
+          debugPrint(
+            '[HomeBloc] network error (attempt $attempt/$maxAttempts, retrying): $e',
+          );
           await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         // Final failure — show error
+        final friendlyMessage = ErrorMapper.getUserMessage(
+          e,
+          context: 'loading the home page',
+        );
         if (state.customizations.isNotEmpty) {
-          emit(state.copyWith(status: HomeStatus.loaded, errorMessage: e.toString()));
+          emit(
+            state.copyWith(
+              status: HomeStatus.loaded,
+              errorMessage: friendlyMessage,
+            ),
+          );
         } else {
-          emit(state.copyWith(status: HomeStatus.error, errorMessage: e.toString()));
+          emit(
+            state.copyWith(
+              status: HomeStatus.error,
+              errorMessage: friendlyMessage,
+            ),
+          );
         }
         return; // Return after emitting state
       }
@@ -140,72 +152,71 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final customizations = results[0] as List<ThemeCustomization>;
     final categories = results[1] as List<HomeCategory>;
 
-      // 2) Fetch all product_carousel sections in parallel
-      final productCarousels = customizations
-          .where((tc) => tc.type == 'product_carousel')
-          .toList();
+    // 2) Fetch all product_carousel sections in parallel
+    final productCarousels = customizations
+        .where((tc) => tc.type == 'product_carousel')
+        .toList();
 
-      final productResults = await Future.wait(
-        productCarousels.map((tc) async {
-          try {
-            final filters =
-                tc.options['filters'] as Map<String, dynamic>? ?? {};
-            final sort = filters['sort'] as String?;
-            final limitRaw = filters['limit'];
-            final limit = limitRaw != null
-                ? int.tryParse(limitRaw.toString()) ?? 8
-                : 8;
+    final productResults = await Future.wait(
+      productCarousels.map((tc) async {
+        try {
+          final filters = tc.options['filters'] as Map<String, dynamic>? ?? {};
+          final sort = filters['sort'] as String?;
+          final limitRaw = filters['limit'];
+          final limit = limitRaw != null
+              ? int.tryParse(limitRaw.toString()) ?? 8
+              : 8;
 
-            // Build filter JSON excluding 'sort' and 'limit'
-            final filterMap = <String, String>{};
-            for (final entry in filters.entries) {
-              if (entry.key == 'sort' || entry.key == 'limit') continue;
-              if (entry.value != null) {
-                filterMap[entry.key] = entry.value.toString();
-              }
+          // Build filter JSON excluding 'sort' and 'limit'
+          final filterMap = <String, String>{};
+          for (final entry in filters.entries) {
+            if (entry.key == 'sort' || entry.key == 'limit') continue;
+            if (entry.value != null) {
+              filterMap[entry.key] = entry.value.toString();
             }
-            final filterJson = filterMap.isNotEmpty
-                ? jsonEncode(filterMap)
-                : null;
-
-            String sortKey = 'NEWEST';
-            bool reverse = true;
-            if (sort == 'created_at-desc') {
-              sortKey = 'NEWEST';
-              reverse = true;
-            } else if (sort == 'price-desc') {
-              sortKey = 'PRICE';
-              reverse = true;
-            } else if (sort == 'price-asc') {
-              sortKey = 'PRICE';
-              reverse = false;
-            } else if (sort == 'name-asc') {
-              sortKey = 'TITLE';
-              reverse = false;
-            } else if (sort == 'name-desc') {
-              sortKey = 'TITLE';
-              reverse = true;
-            }
-
-            return MapEntry(
-              tc.id,
-              await _repository.fetchProducts(
-                first: limit,
-                filter: filterJson,
-                sortKey: sortKey,
-                reverse: reverse,
-              ),
-            );
-          } catch (e) {
-            // If one section fails, skip it — don't crash the whole homepage
-            return MapEntry(tc.id, <HomeProduct>[]);
           }
-        }),
-      );
+          final filterJson = filterMap.isNotEmpty
+              ? jsonEncode(filterMap)
+              : null;
 
-      final Map<String, List<HomeProduct>> productSections = Map.fromEntries(
-        productResults,
-      );
+          String sortKey = 'NEWEST';
+          bool reverse = true;
+          if (sort == 'created_at-desc') {
+            sortKey = 'NEWEST';
+            reverse = true;
+          } else if (sort == 'price-desc') {
+            sortKey = 'PRICE';
+            reverse = true;
+          } else if (sort == 'price-asc') {
+            sortKey = 'PRICE';
+            reverse = false;
+          } else if (sort == 'name-asc') {
+            sortKey = 'TITLE';
+            reverse = false;
+          } else if (sort == 'name-desc') {
+            sortKey = 'TITLE';
+            reverse = true;
+          }
+
+          return MapEntry(
+            tc.id,
+            await _repository.fetchProducts(
+              first: limit,
+              filter: filterJson,
+              sortKey: sortKey,
+              reverse: reverse,
+            ),
+          );
+        } catch (e) {
+          // If one section fails, skip it — don't crash the whole homepage
+          return MapEntry(tc.id, <HomeProduct>[]);
+        }
+      }),
+    );
+
+    final Map<String, List<HomeProduct>> productSections = Map.fromEntries(
+      productResults,
+    );
 
     emit(
       state.copyWith(

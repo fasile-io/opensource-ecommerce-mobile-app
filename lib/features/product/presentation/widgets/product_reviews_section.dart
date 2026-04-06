@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/graphql/graphql_client.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/domain/services/auth_storage.dart';
 import '../../../account/data/repository/account_repository.dart';
@@ -20,6 +21,7 @@ class ProductReviewsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final reviews = product.reviews;
 
     return Padding(
@@ -31,7 +33,7 @@ class ProductReviewsSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Reviews', style: AppTextStyles.text4(context)),
+              Text(l10n.productReviews, style: AppTextStyles.text4(context)),
               _buildWriteReviewButton(context),
             ],
           ),
@@ -39,7 +41,7 @@ class ProductReviewsSection extends StatelessWidget {
           const SizedBox(height: 16),
 
           // ── Rating Summary + Breakdown ──
-          if (reviews.isNotEmpty) _buildRatingSummary(context, reviews),
+          if (reviews.isNotEmpty) _buildRatingSummary(context, reviews, l10n),
 
           if (reviews.isNotEmpty) const SizedBox(height: 16),
 
@@ -48,7 +50,7 @@ class ProductReviewsSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Text(
-                'No reviews yet',
+                l10n.productNoReviewsYet,
                 style: AppTextStyles.text5(context),
               ),
             )
@@ -68,30 +70,33 @@ class ProductReviewsSection extends StatelessWidget {
   }
 
   Widget _buildRatingSummary(
-      BuildContext context, List<ProductReview> reviews) {
+    BuildContext context,
+    List<ProductReview> reviews,
+    AppLocalizations l10n,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avgRating = product.averageRating;
     final totalCount = reviews.length;
 
     // Rating distribution
     final dist = <String, int>{
-      'Very Good': 0,
-      'Good': 0,
-      'Average': 0,
-      'Bad': 0,
-      'Very Bad': 0,
+      l10n.productVeryGood: 0,
+      l10n.productGood: 0,
+      l10n.productAverage: 0,
+      l10n.productBad: 0,
+      l10n.productVeryBad: 0,
     };
     for (final r in reviews) {
       if (r.rating >= 4.5) {
-        dist['Very Good'] = (dist['Very Good'] ?? 0) + 1;
+        dist[l10n.productVeryGood] = (dist[l10n.productVeryGood] ?? 0) + 1;
       } else if (r.rating >= 3.5) {
-        dist['Good'] = (dist['Good'] ?? 0) + 1;
+        dist[l10n.productGood] = (dist[l10n.productGood] ?? 0) + 1;
       } else if (r.rating >= 2.5) {
-        dist['Average'] = (dist['Average'] ?? 0) + 1;
+        dist[l10n.productAverage] = (dist[l10n.productAverage] ?? 0) + 1;
       } else if (r.rating >= 1.5) {
-        dist['Bad'] = (dist['Bad'] ?? 0) + 1;
+        dist[l10n.productBad] = (dist[l10n.productBad] ?? 0) + 1;
       } else {
-        dist['Very Bad'] = (dist['Very Bad'] ?? 0) + 1;
+        dist[l10n.productVeryBad] = (dist[l10n.productVeryBad] ?? 0) + 1;
       }
     }
 
@@ -113,7 +118,9 @@ class ProductReviewsSection extends StatelessWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 9),
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.successGreen,
                     borderRadius: BorderRadius.circular(12),
@@ -141,7 +148,7 @@ class ProductReviewsSection extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        '$totalCount Rating',
+                        l10n.productRating(totalCount),
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 12,
@@ -151,7 +158,7 @@ class ProductReviewsSection extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '$totalCount Reviews',
+                        l10n.productReviewsCount(totalCount),
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 12,
@@ -175,10 +182,10 @@ class ProductReviewsSection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: dist.entries.map((entry) {
                 final count = entry.value;
-                final fraction =
-                    totalCount > 0 ? count / totalCount : 0.0;
+                final fraction = totalCount > 0 ? count / totalCount : 0.0;
                 return _buildRatingBar(
                   context,
+                  l10n: l10n,
                   label: entry.key,
                   fraction: fraction,
                   count: count,
@@ -193,6 +200,7 @@ class ProductReviewsSection extends StatelessWidget {
 
   Widget _buildRatingBar(
     BuildContext context, {
+    required AppLocalizations l10n,
     required String label,
     required double fraction,
     required int count,
@@ -308,7 +316,7 @@ class ProductReviewsSection extends StatelessWidget {
           'Sep',
           'Oct',
           'Nov',
-          'Dec'
+          'Dec',
         ];
         dateStr = 'Posted on ${dt.day} ${months[dt.month]} ${dt.year}';
       } catch (_) {
@@ -340,8 +348,10 @@ class ProductReviewsSection extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: ratingBgColor,
                         borderRadius: BorderRadius.circular(6),
@@ -349,8 +359,11 @@ class ProductReviewsSection extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.star,
-                              size: 16, color: AppColors.white),
+                          const Icon(
+                            Icons.star,
+                            size: 16,
+                            color: AppColors.white,
+                          ),
                           const SizedBox(width: 1),
                           Text(
                             rating.toStringAsFixed(1),
@@ -372,8 +385,9 @@ class ProductReviewsSection extends StatelessWidget {
                           fontFamily: 'Roboto',
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
-                          color:
-                              isDark ? AppColors.neutral100 : AppColors.neutral800,
+                          color: isDark
+                              ? AppColors.neutral100
+                              : AppColors.neutral800,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -461,7 +475,9 @@ class ProductReviewsSection extends StatelessWidget {
             final submitted = await AddReviewPage.navigate(
               context,
               productId: productId,
-              productName: product.name ?? 'Product',
+              productName:
+                  product.name ??
+                  AppLocalizations.of(context)!.productDefaultName,
               productImageUrl: product.baseImageUrl,
             );
 
@@ -469,13 +485,15 @@ class ProductReviewsSection extends StatelessWidget {
             if (submitted == true && context.mounted) {
               final urlKey = product.urlKey;
               if (urlKey != null) {
-                context
-                    .read<ProductDetailBloc>()
-                    .add(LoadProductDetail(urlKey: urlKey));
+                context.read<ProductDetailBloc>().add(
+                  LoadProductDetail(urlKey: urlKey, productType: product.type),
+                );
               }
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Your review has been submitted!'),
+                SnackBar(
+                  content: Text(
+                    AppLocalizations.of(context)!.productReviewSubmitted,
+                  ),
                   backgroundColor: AppColors.successGreen,
                 ),
               );
@@ -487,8 +505,8 @@ class ProductReviewsSection extends StatelessWidget {
               color: AppColors.primary500,
               borderRadius: BorderRadius.circular(54),
             ),
-            child: const Text(
-              'Write a Review',
+            child: Text(
+              AppLocalizations.of(context)!.productWriteReview,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 14,
@@ -512,16 +530,19 @@ class ProductReviewsSection extends StatelessWidget {
         if (!context.mounted) return;
         if (accessToken == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please login to view your reviews'),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)!.productPleaseLoginForReviews,
+              ),
               backgroundColor: Colors.red,
-              duration: Duration(seconds: 2),
+              duration: const Duration(seconds: 2),
             ),
           );
           return;
         }
-        final client =
-            GraphQLClientProvider.authenticatedClient(accessToken).value;
+        final client = GraphQLClientProvider.authenticatedClient(
+          accessToken,
+        ).value;
         final repository = AccountRepository(client: client);
         if (!context.mounted) return;
         Navigator.of(context).push(
@@ -530,10 +551,12 @@ class ProductReviewsSection extends StatelessWidget {
               value: repository,
               child: BlocProvider(
                 create: (_) => ReviewBloc(repository: repository)
-                  ..add(LoadReviews(
-                    mode: ReviewMode.product,
-                    productId: product.numericId,
-                  )),
+                  ..add(
+                    LoadReviews(
+                      mode: ReviewMode.product,
+                      productId: product.numericId,
+                    ),
+                  ),
                 child: const ReviewsPage(),
               ),
             ),
@@ -551,7 +574,7 @@ class ProductReviewsSection extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Text(
-          'Load More Reviews',
+          AppLocalizations.of(context)!.productLoadMoreReviews,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontSize: 14,

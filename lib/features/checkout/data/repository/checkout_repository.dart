@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../../../core/graphql/graphql_client.dart';
 import '../../../../core/graphql/checkout_queries.dart';
 import '../../../../core/graphql/account_queries.dart';
-import '../../../../core/constants/api_constants.dart';
 import '../models/checkout_model.dart';
 
 /// Repository for all checkout operations via Bagisto GraphQL API.
@@ -59,31 +59,8 @@ class CheckoutRepository {
   /// The best cart-query token we have.
   String? get cartQueryToken => _cartQueryToken;
 
-  GraphQLClient get _authedClient {
-    if (_authToken == null || _authToken!.isEmpty) {
-      debugPrint(
-        '[CheckoutRepo] WARNING _authedClient: authToken is null/empty — using unauthenticated client',
-      );
-      return client;
-    }
-    final httpLink = HttpLink(
-      bagistoEndpoint,
-      defaultHeaders: {
-        'Content-Type': 'application/json',
-        'X-STOREFRONT-KEY': storefrontKey,
-      },
-    );
-    final authLink = AuthLink(getToken: () async => 'Bearer $_authToken');
-    final link = authLink.concat(httpLink);
-    return GraphQLClient(
-      cache: GraphQLCache(store: InMemoryStore()),
-      link: link,
-      defaultPolicies: DefaultPolicies(
-        query: Policies(fetch: FetchPolicy.noCache),
-        mutate: Policies(fetch: FetchPolicy.noCache),
-      ),
-    );
-  }
+  GraphQLClient get _authedClient =>
+      GraphQLClientProvider.buildClient(token: _authToken);
 
   // ─── Queries ─────────────────────────────────────────────────────────────
 

@@ -1,15 +1,16 @@
-import 'package:bagisto_flutter/features/account/presentation/pages/settings_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import '../../../../core/currency/currency_cubit.dart';
 import '../../../../core/graphql/graphql_client.dart';
+import '../../../../core/locale/locale_cubit.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../account/data/repository/account_repository.dart';
 import '../../../account/presentation/bloc/account_dashboard_bloc.dart';
 import '../../../account/presentation/pages/account_dashboard_page.dart';
 import '../../../account/presentation/pages/preferences_bottom_sheet.dart';
 import '../bloc/auth_bloc.dart';
-import '../widgets/social_login_icons.dart';
 import 'login_page.dart';
 import 'sign_up_page.dart';
 
@@ -46,17 +47,36 @@ class _AccountPageState extends State<AccountPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, state) {
-        if (state is AuthAuthenticated) {
-          return _buildAuthenticatedDashboard(context, state);
-        }
-        // Clean up bloc when logged out
-        _dashboardBloc?.close();
-        _dashboardBloc = null;
-        _currentToken = null;
-        return const _LoggedOutView();
-      },
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<LocaleCubit, Locale?>(
+          listenWhen: (previous, current) =>
+              current != null &&
+              previous?.languageCode != current.languageCode,
+          listener: (context, state) {
+            _dashboardBloc?.add(const RefreshAccountDashboard());
+          },
+        ),
+        BlocListener<CurrencyCubit, String?>(
+          listenWhen: (previous, current) =>
+              current != null && previous != current,
+          listener: (context, state) {
+            _dashboardBloc?.add(const RefreshAccountDashboard());
+          },
+        ),
+      ],
+      child: BlocBuilder<AuthBloc, AuthState>(
+        builder: (context, state) {
+          if (state is AuthAuthenticated) {
+            return _buildAuthenticatedDashboard(context, state);
+          }
+          // Clean up bloc when logged out
+          _dashboardBloc?.close();
+          _dashboardBloc = null;
+          _currentToken = null;
+          return const _LoggedOutView();
+        },
+      ),
     );
   }
 
@@ -99,6 +119,7 @@ class _LoggedOutView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -125,7 +146,7 @@ class _LoggedOutView extends StatelessWidget {
 
                       // ── "Nice to see you here" ──
                       Text(
-                        'Nice to see you here',
+                        l10n.authNiceToSeeYouHere,
                         style: AppTextStyles.text2(context),
                         textAlign: TextAlign.center,
                       ),
@@ -133,7 +154,7 @@ class _LoggedOutView extends StatelessWidget {
                       const SizedBox(height: 12),
 
                       // ── Sign Up & Login Buttons ──
-                      _buildAuthButtons(context, isDark),
+                      _buildAuthButtons(context, isDark, l10n),
 
                       const SizedBox(height: 36),
 
@@ -167,7 +188,7 @@ class _LoggedOutView extends StatelessWidget {
             // ── Preferences Chip (bottom) ──
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
-              child: _buildPreferencesChip(context, isDark),
+              child: _buildPreferencesChip(context, isDark, l10n),
             ),
           ],
         ),
@@ -187,7 +208,11 @@ class _LoggedOutView extends StatelessWidget {
   }
 
   /// Sign Up (primary) + Login (secondary) buttons
-  Widget _buildAuthButtons(BuildContext context, bool isDark) {
+  Widget _buildAuthButtons(
+    BuildContext context,
+    bool isDark,
+    AppLocalizations l10n,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 0),
       child: Row(
@@ -216,7 +241,7 @@ class _LoggedOutView extends StatelessWidget {
                     height: 1.17,
                   ),
                 ),
-                child: const Text('Sign Up'),
+                child: Text(l10n.authSignUp),
               ),
             ),
           ),
@@ -249,7 +274,7 @@ class _LoggedOutView extends StatelessWidget {
                     height: 1.17,
                   ),
                 ),
-                child: const Text('Login'),
+                child: Text(l10n.authLogin),
               ),
             ),
           ),
@@ -260,9 +285,14 @@ class _LoggedOutView extends StatelessWidget {
 
   /// Preferences chip at bottom
   /// Figma: list component — neutral/100 bg, 10px radius
-  Widget _buildPreferencesChip(BuildContext context, bool isDark) {
+  Widget _buildPreferencesChip(
+    BuildContext context,
+    bool isDark,
+    AppLocalizations l10n,
+  ) {
     return GestureDetector(
-      onTap: () => SettingsBottomSheet.show(context),
+      onTap: () =>
+          PreferencesBottomSheet.show(context, showSettingsSection: true),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -273,13 +303,13 @@ class _LoggedOutView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.settings_outlined,
+              Icons.tune_outlined,
               size: 24,
               color: isDark ? AppColors.neutral300 : AppColors.neutral900,
             ),
             const SizedBox(width: 4),
             Text(
-              'Settings',
+              l10n.accountPreferences,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,

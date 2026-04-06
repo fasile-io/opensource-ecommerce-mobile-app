@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/repository/account_repository.dart';
@@ -169,6 +170,8 @@ class AccountDashboardPage extends StatelessWidget {
   }
 
   Widget _buildErrorView(BuildContext context, String? errorMessage) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -177,10 +180,10 @@ class AccountDashboardPage extends StatelessWidget {
           children: [
             Icon(Icons.error_outline, size: 64, color: AppColors.neutral400),
             const SizedBox(height: 16),
-            Text('Something went wrong', style: AppTextStyles.text3(context)),
+            Text(l10n.categorySomethingWentWrong, style: AppTextStyles.text3(context)),
             const SizedBox(height: 8),
             Text(
-              errorMessage ?? 'Please try again later',
+              errorMessage ?? l10n.accountPleaseTryAgainLater,
               style: AppTextStyles.text5(
                 context,
               ).copyWith(color: AppColors.neutral500),
@@ -200,7 +203,7 @@ class AccountDashboardPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Retry'),
+              child: Text(l10n.commonRetry),
             ),
           ],
         ),

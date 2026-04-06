@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 import '../bloc/orders_bloc.dart';
@@ -30,6 +31,7 @@ class OrdersPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -40,7 +42,7 @@ class OrdersPage extends StatelessWidget {
         leading: const AppBackButton(),
         titleSpacing: 0,
         title: Text(
-          'Orders',
+          l10n.accountOrders,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -92,6 +94,7 @@ class OrdersPage extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -105,7 +108,7 @@ class OrdersPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Orders Yet',
+              l10n.accountNoOrdersYet,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -115,7 +118,7 @@ class OrdersPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Your orders will appear here once you make a purchase.',
+              l10n.accountOrdersEmptyDescription,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -132,6 +135,7 @@ class OrdersPage extends StatelessWidget {
 
   Widget _buildErrorState(BuildContext context, String? message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -145,7 +149,7 @@ class OrdersPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              message ?? 'Something went wrong',
+              message ?? l10n.categorySomethingWentWrong,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -158,8 +162,8 @@ class OrdersPage extends StatelessWidget {
             TextButton(
               onPressed: () =>
                   context.read<OrdersBloc>().add(const LoadOrders()),
-              child: const Text(
-                'Retry',
+              child: Text(
+                l10n.commonRetry,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -279,6 +283,7 @@ class _CountHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 8),
@@ -287,7 +292,7 @@ class _CountHeader extends StatelessWidget {
         children: [
           // "N Orders" — Figma: Roboto Medium 12, #171717
           Text(
-            '$totalCount Order${totalCount == 1 ? '' : 's'}',
+            '${totalCount} ${totalCount == 1 ? l10n.accountOrderSingular : l10n.accountOrderPlural}',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w500,
@@ -323,6 +328,7 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       width: double.infinity,
@@ -367,7 +373,7 @@ class _OrderCard extends StatelessWidget {
 
                 // Price + items — Figma: Roboto Regular 14, #525252
                 Text(
-                  '${order.formattedTotal} (Items ${order.totalItemCount})',
+                  l10n.accountOrderTotalItems(order.formattedTotal, order.totalItemCount),
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Roboto',

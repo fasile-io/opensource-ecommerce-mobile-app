@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/graphql/graphql_client.dart';
 import '../../../../core/graphql/account_queries.dart';
 import '../../data/models/account_models.dart';
@@ -20,22 +21,33 @@ class ContactUsState extends Equatable {
     this.errorMessage,
   });
 
+  static const Object _unset = Object();
+
   ContactUsState copyWith({
     bool? isSubmitting,
     bool? isSuccess,
-    String? successMessage,
-    String? errorMessage,
+    Object? successMessage = _unset,
+    Object? errorMessage = _unset,
   }) {
     return ContactUsState(
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSuccess: isSuccess ?? this.isSuccess,
-      successMessage: successMessage ?? this.successMessage,
-      errorMessage: errorMessage ?? this.errorMessage,
+      successMessage: identical(successMessage, _unset)
+          ? this.successMessage
+          : successMessage as String?,
+      errorMessage: identical(errorMessage, _unset)
+          ? this.errorMessage
+          : errorMessage as String?,
     );
   }
 
   @override
-  List<Object?> get props => [isSubmitting, isSuccess, successMessage, errorMessage];
+  List<Object?> get props => [
+    isSubmitting,
+    isSuccess,
+    successMessage,
+    errorMessage,
+  ];
 }
 
 /// Cubit to manage Contact Us form submission.
@@ -49,12 +61,14 @@ class ContactUsCubit extends Cubit<ContactUsState> {
     required String contact,
     required String message,
   }) async {
-    emit(state.copyWith(
-      isSubmitting: true,
-      isSuccess: false,
-      errorMessage: null,
-      successMessage: null,
-    ));
+    emit(
+      state.copyWith(
+        isSubmitting: true,
+        isSuccess: false,
+        errorMessage: null,
+        successMessage: null,
+      ),
+    );
 
     try {
       final submission = ContactUsSubmission(
@@ -69,20 +83,23 @@ class ContactUsCubit extends Cubit<ContactUsState> {
       final result = await client.mutate(
         MutationOptions(
           document: gql(AccountQueries.createContactUs),
-          variables: {
-            'input': submission.toJson(),
-          },
+          variables: {'input': submission.toJson()},
           errorPolicy: ErrorPolicy.all,
         ),
       );
 
       if (result.hasException) {
-        final errorMessage = _parseGraphQLError(result.exception);
-        emit(state.copyWith(
-          isSubmitting: false,
-          isSuccess: false,
-          errorMessage: errorMessage,
-        ));
+        final errorMessage = ErrorMapper.fromQueryResult(
+          result,
+          context: 'submitting your message',
+        );
+        emit(
+          state.copyWith(
+            isSubmitting: false,
+            isSuccess: false,
+            errorMessage: errorMessage,
+          ),
+        );
         return;
       }
 
@@ -90,51 +107,42 @@ class ContactUsCubit extends Cubit<ContactUsState> {
       final contactUsData = data?['contactUs'] as Map<String, dynamic>?;
 
       if (contactUsData == null) {
-        emit(state.copyWith(
-          isSubmitting: false,
-          isSuccess: false,
-          errorMessage: 'Invalid response from server',
-        ));
+        emit(
+          state.copyWith(
+            isSubmitting: false,
+            isSuccess: false,
+            errorMessage: 'Invalid response from server',
+          ),
+        );
         return;
       }
 
       final response = ContactUsResponse.fromJson(contactUsData);
 
-      emit(state.copyWith(
-        isSubmitting: false,
-        isSuccess: response.success,
-        successMessage: response.success ? response.message : null,
-        errorMessage: !response.success ? response.message : null,
-      ));
+      emit(
+        state.copyWith(
+          isSubmitting: false,
+          isSuccess: response.success,
+          successMessage: response.success ? response.message : null,
+          errorMessage: !response.success ? response.message : null,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isSubmitting: false,
-        isSuccess: false,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          isSubmitting: false,
+          isSuccess: false,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'submitting your message',
+          ),
+        ),
+      );
     }
   }
 
   /// Reset form state
   void reset() {
     emit(const ContactUsState());
-  }
-
-  /// Parse GraphQL error message
-  String _parseGraphQLError(dynamic exception) {
-    final error = exception.toString();
-    
-    // Check for common GraphQL errors
-    if (error.contains('Unknown type')) {
-      return 'Contact Us API is not available. Please try again later.';
-    }
-    if (error.contains('Network')) {
-      return 'Network error. Please check your connection.';
-    }
-    if (error.contains('Unauthorized')) {
-      return 'Authentication required.';
-    }
-    
-    return error;
   }
 }

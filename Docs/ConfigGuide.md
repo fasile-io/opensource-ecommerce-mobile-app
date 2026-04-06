@@ -13,8 +13,9 @@ This guide explains how to configure the Bagisto Flutter app for your specific n
 5. [Splash Screen](#splash-screen)
 6. [Permissions Configuration](#permissions-configuration)
 7. [Push Notifications (Firebase)](#push-notifications-firebase)
-8. [GraphQL Configuration](#graphql-configuration)
-9. [Summary of Configuration Files](#summary-of-configuration-files)
+8. [Language & Localization Configuration](#language--localization-configuration)
+9. [GraphQL Configuration](#graphql-configuration)
+10. [Summary of Configuration Files](#summary-of-configuration-files)
 
 ---
 
@@ -22,7 +23,7 @@ This guide explains how to configure the Bagisto Flutter app for your specific n
 
 Configure the Bagisto API endpoint and storefront key:
 
-**File:** `lib/core/constants/api_constants.dart`
+**File:** [`lib/core/constants/api_constants.dart`](../lib/core/constants/api_constants.dart)
 
 ```dart
 /// Bagisto API endpoint
@@ -36,7 +37,7 @@ const String companyName = 'Your Company Name';
 ```
 
 ### Steps:
-1. Open `lib/core/constants/api_constants.dart`
+1. Open [`lib/core/constants/api_constants.dart`](../lib/core/constants/api_constants.dart)
 2. Replace `bagistoEndpoint` with your Bagisto GraphQL endpoint
 3. Replace `storefrontKey` with your storefront API key from Bagisto Admin
 4. Update `companyName` to your company name
@@ -47,11 +48,11 @@ const String companyName = 'Your Company Name';
 
 Customize the app's primary colors and theme:
 
-**File:** `lib/core/theme/app_theme.dart`
+**File:** [`lib/core/theme/app_theme.dart`](../lib/core/theme/app_theme.dart)
 
 ### Primary Colors
 
-In the `AppColors` class, modify the primary colors:
+In the [`AppColors`](../lib/core/theme/app_theme.dart) class, modify the primary colors:
 
 ```dart
 class AppColors {
@@ -89,7 +90,7 @@ class AppColors {
 
 ### Theme Configuration
 
-The app supports both Light and Dark themes configured in the `AppTheme` class:
+The app supports both Light and Dark themes configured in the [`AppTheme`](../lib/core/theme/app_theme.dart) class:
 
 - **Light Theme:** Uses white backgrounds with neutral-900 text
 - **Dark Theme:** Uses neutral-900 backgrounds with neutral-200 text
@@ -104,7 +105,7 @@ For detailed color customization, see [ColorSetUp.md](./ColorSetUp.md).
 
 ### Android
 
-**File:** `android/app/src/main/AndroidManifest.xml`
+**File:** [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml)
 
 Find and modify the `android:label` attribute:
 
@@ -119,7 +120,7 @@ Current default: `Mobikul Bagisto Laravel App`
 
 ### iOS
 
-**File:** `ios/Runner/Info.plist`
+**File:** [`ios/Runner/Info.plist`](../ios/Runner/Info.plist)
 
 Find and modify the `CFBundleDisplayName` key:
 
@@ -140,11 +141,11 @@ Current default: `Mobikul Bagisto Laravel App`
 2. Right-click on `app` → New → Image Asset
 3. Set your custom icon image
 
-**Icon Location:** `android/app/src/main/res/mipmap-*/`
+**Icon Location:** [`android/app/src/main/res/mipmap-xxxhdpi/`](../android/app/src/main/res/mipmap-xxxhdpi/)
 
 ### iOS
 
-**File:** `ios/Runner/Assets.xcassets/AppIcon.appiconset/`
+**File:** [`ios/Runner/Assets.xcassets/AppIcon.appiconset/`](../ios/Runner/Assets.xcassets/AppIcon.appiconset/)
 
 Replace the existing app icon images with your custom icons. Use Xcode's AppIcon template for proper sizing.
 
@@ -154,7 +155,7 @@ Replace the existing app icon images with your custom icons. Use Xcode's AppIcon
 
 ### Android
 
-**File:** `android/app/src/main/res/drawable-v21/launch_background.xml`
+**File:** [`android/app/src/main/res/drawable-v21/launch_background.xml`](../android/app/src/main/res/drawable-v21/launch_background.xml)
 
 Modify the splash background:
 
@@ -167,14 +168,14 @@ Modify the splash background:
 
 ### iOS
 
-**File:** `ios/Runner/Assets.xcassets/LaunchImage.imageset/`
+**File:** [`ios/Runner/Assets.xcassets/LaunchImage.imageset/`](../ios/Runner/Assets.xcassets/LaunchImage.imageset/)
 
 Replace the following files with your custom splash image:
 - `LaunchImage.png` (1x)
 - `LaunchImage@2x.png` (2x)
 - `LaunchImage@3x.png` (3x)
 
-Also update `ios/Runner/Assets.xcassets/splash.imageset/` for Flutter splash assets used by the Flutter layer.
+Also update [`ios/Runner/Assets.xcassets/splash.imageset/`](../ios/Runner/Assets.xcassets/splash.imageset/) for Flutter splash.
 
 ---
 
@@ -184,7 +185,7 @@ The app requires several permissions for full functionality:
 
 ### Android Permissions
 
-**File:** `android/app/src/main/AndroidManifest.xml`
+**File:** [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml)
 
 ```xml
 <!-- Camera permissions for image search -->
@@ -203,7 +204,7 @@ The app requires several permissions for full functionality:
 
 ### iOS Permissions
 
-**File:** `ios/Runner/Info.plist`
+**File:** [`ios/Runner/Info.plist`](../ios/Runner/Info.plist)
 
 ```xml
 <!-- Camera for image search -->
@@ -233,7 +234,7 @@ To enable Firebase Cloud Messaging (Push Notifications), replace the dummy confi
 
 ### Android
 
-**File:** `android/app/google-services.json`
+**File:** [`android/app/google-services.json`](../android/app/google-services.json)
 
 Replace this file with your Firebase configuration file from the [Firebase Console](https://console.firebase.google.com/):
 
@@ -244,7 +245,7 @@ Replace this file with your Firebase configuration file from the [Firebase Conso
 
 ### iOS
 
-**File:** `ios/Runner/GoogleService-Info.plist`
+**File:** [`ios/Runner/GoogleService-Info.plist`](../ios/Runner/GoogleService-Info.plist)
 
 Replace this file with your Firebase configuration file:
 
@@ -257,27 +258,80 @@ Replace this file with your Firebase configuration file:
 
 ---
 
+## Language & Localization Configuration
+
+The app already includes Flutter localization support and a language selector backed by Bagisto locale data.
+
+### Current Supported Languages
+
+The current app build supports these locales:
+
+- `ar` - Arabic
+- `de` - German
+- `en` - English
+- `es` - Spanish
+- `fr` - French
+- `it` - Italian
+- `nl` - Dutch
+- `ru` - Russian
+- `tr` - Turkish
+- `uk` - Ukrainian
+
+These locales are generated from the ARB files inside [`lib/l10n/`](../lib/l10n/).
+
+### Core Localization Files
+
+| Purpose | File |
+|---------|------|
+| Enable Flutter localization generation | [`pubspec.yaml`](../pubspec.yaml) |
+| Localization generator config | [`l10n.yaml`](../l10n.yaml) |
+| Base translation template | [`lib/l10n/app_en.arb`](../lib/l10n/app_en.arb) |
+| Generated supported locales and delegates | [`lib/l10n/app_localizations.dart`](../lib/l10n/app_localizations.dart) |
+| Apply locale to `MaterialApp` | [`lib/main.dart`](../lib/main.dart) |
+| Save selected locale in storage | [`lib/core/locale/locale_cubit.dart`](../lib/core/locale/locale_cubit.dart) |
+| Bootstrap Bagisto locales on app start | [`lib/core/channel/channel_bootstrap_service.dart`](../lib/core/channel/channel_bootstrap_service.dart) |
+| Send selected locale in GraphQL headers | [`lib/core/graphql/graphql_client.dart`](../lib/core/graphql/graphql_client.dart) |
+| Language selector UI | [`lib/features/account/presentation/pages/preferences_bottom_sheet.dart`](../lib/features/account/presentation/pages/preferences_bottom_sheet.dart) |
+
+### How It Works
+
+1. On app startup, [`ChannelBootstrapService`](../lib/core/channel/channel_bootstrap_service.dart) fetches channel locales and the default locale from Bagisto.
+2. The selected locale code is stored in shared preferences using [`LocaleCubit`](../lib/core/locale/locale_cubit.dart).
+3. [`MaterialApp`](../lib/main.dart) uses that locale together with `AppLocalizations.delegate` and `AppLocalizations.supportedLocales`.
+4. When the user changes language from the account/settings UI, the app updates the locale, clears GraphQL cache, and reloads key screens.
+5. Every GraphQL request includes the selected locale in the `X-LOCALE` header so Bagisto can return translated content.
+
+### Important Note
+
+The current implementation is built around simple language codes such as `en`, `fr`, and `ar`. If you want region-specific locale codes such as `pt_BR` or `en_GB`, you will need code changes in locale storage and comparison logic.
+
+### Add a New Language
+
+For the complete step-by-step guide to add a new language to the app, see [LanguageConfiguration.md](./LanguageConfiguration.md).
+
+---
+
 ## GraphQL Configuration
 
 The app uses GraphQL for API communication. The configuration is handled in:
 
-**File:** `lib/core/graphql/graphql_client.dart`
+**File:** [`lib/core/graphql/graphql_client.dart`](../lib/core/graphql/graphql_client.dart)
 
 ### Key Features:
 
 | Feature | Configuration |
 |---------|---------------|
-| HTTP Timeout | 30 seconds (connect & receive) |
+| HTTP Timeout | 60 seconds (connect & receive) |
 | Authentication | Bearer token for authenticated requests |
-| Storefront Key | X-STOREFRONT-KEY header |
+| Dynamic Headers | `X-STOREFRONT-KEY`, `X-LOCALE`, `X-CURRENCY` |
 | Cache | HiveStore with fallback to InMemoryStore |
 | Logging | Request/response logging enabled |
 | Fetch Policy | networkOnly (bypasses cache for queries) |
 
 ### Client Types:
 
-1. **Standard Client** `GraphQLClientProvider.client` - For guest users
-2. **Authenticated Client** `GraphQLClientProvider.authenticatedClient` - For logged-in users with Bearer token
+1. **Standard Client** ([`GraphQLClientProvider.client`](../lib/core/graphql/graphql_client.dart)) - For guest users
+2. **Authenticated Client** ([`GraphQLClientProvider.authenticatedClient`](../lib/core/graphql/graphql_client.dart)) - For logged-in users with Bearer token
 
 ---
 
@@ -285,26 +339,31 @@ The app uses GraphQL for API communication. The configuration is handled in:
 
 | Configuration | File Path |
 |--------------|-----------|
-| **API Endpoint** | `lib/core/constants/api_constants.dart` |
-| **Theme/Colors** | `lib/core/theme/app_theme.dart` |
-| **Android App Name** | `android/app/src/main/AndroidManifest.xml` |
-| **iOS App Name** | `ios/Runner/Info.plist` |
-| **Android Icons** | `android/app/src/main/res/mipmap-*/` |
-| **iOS Icons** | `ios/Runner/Assets.xcassets/AppIcon.appiconset/` |
-| **Android Splash** | `android/app/src/main/res/drawable-v21/launch_background.xml` |
-| **iOS Splash** | `ios/Runner/Assets.xcassets/LaunchImage.imageset/` |
-| **Android Firebase** | `android/app/google-services.json` |
-| **iOS Firebase** | `ios/Runner/GoogleService-Info.plist` |
-| **GraphQL Client** | `lib/core/graphql/graphql_client.dart` |
-| **Android Permissions** | `android/app/src/main/AndroidManifest.xml` |
-| **iOS Permissions** | `ios/Runner/Info.plist` |
-| **Dependencies** | `pubspec.yaml` |
+| **API Endpoint** | [`lib/core/constants/api_constants.dart`](../lib/core/constants/api_constants.dart) |
+| **Theme/Colors** | [`lib/core/theme/app_theme.dart`](../lib/core/theme/app_theme.dart) |
+| **Android App Name** | [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml) |
+| **iOS App Name** | [`ios/Runner/Info.plist`](../ios/Runner/Info.plist) |
+| **Android Icons** | [`android/app/src/main/res/mipmap-xxxhdpi/`](../android/app/src/main/res/mipmap-xxxhdpi/) |
+| **iOS Icons** | [`ios/Runner/Assets.xcassets/AppIcon.appiconset/`](../ios/Runner/Assets.xcassets/AppIcon.appiconset/) |
+| **Android Splash** | [`android/app/src/main/res/drawable-v21/launch_background.xml`](../android/app/src/main/res/drawable-v21/launch_background.xml) |
+| **iOS Splash** | [`ios/Runner/Assets.xcassets/LaunchImage.imageset/`](../ios/Runner/Assets.xcassets/LaunchImage.imageset/) |
+| **Android Firebase** | [`android/app/google-services.json`](../android/app/google-services.json) |
+| **iOS Firebase** | [`ios/Runner/GoogleService-Info.plist`](../ios/Runner/GoogleService-Info.plist) |
+| **Localization ARB Files** | [`lib/l10n/`](../lib/l10n/) |
+| **Localization Generator Config** | [`l10n.yaml`](../l10n.yaml) |
+| **Locale State Management** | [`lib/core/locale/locale_cubit.dart`](../lib/core/locale/locale_cubit.dart) |
+| **Locale Bootstrap from Bagisto** | [`lib/core/channel/channel_bootstrap_service.dart`](../lib/core/channel/channel_bootstrap_service.dart) |
+| **GraphQL Client** | [`lib/core/graphql/graphql_client.dart`](../lib/core/graphql/graphql_client.dart) |
+| **Android Permissions** | [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml) |
+| **iOS Permissions** | [`ios/Runner/Info.plist`](../ios/Runner/Info.plist) |
+| **Dependencies** | [`pubspec.yaml`](../pubspec.yaml) |
 
 ---
 
 ## Additional Resources
 
 - [ColorSetUp.md](./ColorSetUp.md) - Detailed color customization guide
+- [LanguageConfiguration.md](./LanguageConfiguration.md) - Add or update app languages
 - [ServerConfig.md](./ServerConfig.md) - Server-side configuration
-- [installationGuide.md](./installationGuide.md) - App installation instructions
+- [InstallationGuide.md](./installationGuide.md) - App installation instructions
 - [PlaceholderSetup.md](./PlaceholderSetup.md) - Placeholder image configuration

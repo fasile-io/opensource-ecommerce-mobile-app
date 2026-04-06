@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../bloc/auth_bloc.dart';
 
 /// Forgot Password page
@@ -35,6 +36,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -79,7 +81,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   const SizedBox(height: 32),
 
                   Text(
-                    'Forgot Password?',
+                    l10n.authForgotPasswordTitle,
                     style: AppTextStyles.text2(context),
                     textAlign: TextAlign.center,
                   ),
@@ -87,7 +89,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   const SizedBox(height: 8),
 
                   Text(
-                    'Enter your email address and we\'ll send you a link to reset your password.',
+                    l10n.authForgotPasswordSubtitle,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
@@ -107,7 +109,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Email Address',
+                        l10n.authEmailAddress,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w500,
@@ -124,12 +126,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
+                            return l10n.authPleaseEnterEmail;
                           }
                           if (!RegExp(
                             r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
                           ).hasMatch(value)) {
-                            return 'Please enter a valid email';
+                            return l10n.authPleaseEnterValidEmail;
                           }
                           return null;
                         },
@@ -141,7 +143,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               : AppColors.neutral900,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Enter your email',
+                          hintText: l10n.authEnterYourEmail,
                           hintStyle: TextStyle(
                             fontFamily: 'Roboto',
                             fontSize: 14,
@@ -226,7 +228,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                     ),
                                   ),
                                 )
-                              : const Text('Send Reset Link'),
+                              : Text(l10n.authSendResetLink),
                         ),
                       );
                     },
@@ -238,8 +240,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   Center(
                     child: GestureDetector(
                       onTap: () => Navigator.of(context).pop(),
-                      child: const Text(
-                        'Back to Login',
+                      child: Text(
+                        l10n.authBackToLogin,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w600,

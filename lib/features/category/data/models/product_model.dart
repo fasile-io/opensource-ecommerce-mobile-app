@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 
 /// Product model matching Bagisto GraphQL schema
@@ -6,6 +7,7 @@ import 'dart:developer' as developer;
 class ProductModel {
   final String id;
   final int? numericId; // _id field from API
+  final int? qty;
   final String? sku;
   final String? type;
   final String? name;
@@ -13,22 +15,42 @@ class ProductModel {
   final String? description;
   final String? shortDescription;
   final double? price;
+  final String? formattedPrice;
   final String? baseImageUrl;
   final double? minimumPrice;
+  final String? formattedMinimumPrice;
   final double? specialPrice;
+  final String? formattedSpecialPrice;
   final bool? isSaleable;
   final String? color;
   final String? size;
   final String? brand;
+  final double? maximumPrice;
+  final String? formattedMaximumPrice;
+  final double? regularMinimumPrice;
+  final double? regularMaximumPrice;
+  final String? formattedRegularMinimumPrice;
+  final String? formattedRegularMaximumPrice;
+  final bool? guestCheckout;
+  final String? superAttributeOptionsJson;
+  final String? combinationsJson;
+  final List<AttributeValueItem> attributeValues;
+  final List<ProductCategory> categories;
   final List<ProductImage> images;
   final List<SuperAttribute> superAttributes;
   final List<ProductVariant> variants;
   final List<ProductReview> reviews;
   final List<ProductModel> relatedProducts;
+  final List<DownloadableLink> downloadableLinks;
+  final List<DownloadableSample> downloadableSamples;
+  final List<GroupedProductItem> groupedProducts;
+  final List<BundleOption> bundleOptions;
+  final List<BookingProductData> bookingProducts;
 
   const ProductModel({
     required this.id,
     this.numericId,
+    this.qty,
     this.sku,
     this.type,
     this.name,
@@ -36,18 +58,37 @@ class ProductModel {
     this.description,
     this.shortDescription,
     this.price,
+    this.formattedPrice,
     this.baseImageUrl,
     this.minimumPrice,
+    this.formattedMinimumPrice,
     this.specialPrice,
+    this.formattedSpecialPrice,
     this.isSaleable,
     this.color,
     this.size,
     this.brand,
+    this.maximumPrice,
+    this.formattedMaximumPrice,
+    this.regularMinimumPrice,
+    this.regularMaximumPrice,
+    this.formattedRegularMinimumPrice,
+    this.formattedRegularMaximumPrice,
+    this.guestCheckout,
+    this.superAttributeOptionsJson,
+    this.combinationsJson,
+    this.attributeValues = const [],
+    this.categories = const [],
     this.images = const [],
     this.superAttributes = const [],
     this.variants = const [],
     this.reviews = const [],
     this.relatedProducts = const [],
+    this.downloadableLinks = const [],
+    this.downloadableSamples = const [],
+    this.groupedProducts = const [],
+    this.bundleOptions = const [],
+    this.bookingProducts = const [],
   });
 
   /// Calculate discount percentage
@@ -69,6 +110,23 @@ class ProductModel {
     return minimumPrice ?? price ?? 0;
   }
 
+  String get formattedDisplayPrice {
+    if (specialPrice != null &&
+        specialPrice! > 0 &&
+        (formattedSpecialPrice?.isNotEmpty ?? false)) {
+      return formattedSpecialPrice!;
+    }
+    if (minimumPrice != null &&
+        minimumPrice! > 0 &&
+        (formattedMinimumPrice?.isNotEmpty ?? false)) {
+      return formattedMinimumPrice!;
+    }
+    if (formattedPrice?.isNotEmpty ?? false) {
+      return formattedPrice!;
+    }
+    return '';
+  }
+
   /// Get original price (for strikethrough) — only if there's a real discount
   double? get originalPrice {
     if (specialPrice != null &&
@@ -76,6 +134,14 @@ class ProductModel {
         price != null &&
         specialPrice! < price!) {
       return price;
+    }
+    return null;
+  }
+
+  String? get formattedOriginalPrice {
+    if (originalPrice == null) return null;
+    if (formattedPrice?.isNotEmpty ?? false) {
+      return formattedPrice;
     }
     return null;
   }
@@ -107,19 +173,79 @@ class ProductModel {
   /// Whether this is a configurable product
   bool get isConfigurable => type == 'configurable';
 
-  /// Build configurable attributes from variants
-  /// Since superAttributes.options returns null from the API,
-  /// we derive the available options from variant data
+  /// Whether this is a virtual product
+  bool get isVirtual => type == 'virtual';
+
+  /// Whether this is a downloadable product
+  bool get isDownloadable => type == 'downloadable';
+
+  /// Whether this is a grouped product
+  bool get isGrouped => type == 'grouped';
+
+  /// Whether this is a bundle product
+  bool get isBundle => type == 'bundle';
+
+  /// Whether this is a booking product
+  bool get isBooking => type == 'booking';
+
+  /// Build configurable attributes from API data.
+  /// Prefers `superAttributeOptions` JSON (new API) and falls back to
+  /// deriving options from variants + superAttributes (legacy API).
   List<ConfigurableAttribute> get configurableAttributes {
-    if (!isConfigurable || variants.isEmpty) return [];
+    if (!isConfigurable) return [];
+
+    // ── New API: parse superAttributeOptions JSON string ──
+    if (superAttributeOptionsJson != null &&
+        superAttributeOptionsJson!.isNotEmpty) {
+      try {
+        final List<dynamic> parsed = jsonDecode(superAttributeOptionsJson!);
+        developer.log(
+          'configurableAttributes: parsed ${parsed.length} attributes from superAttributeOptions',
+          name: 'ProductModel',
+        );
+        final attrs = <ConfigurableAttribute>[];
+        for (final attr in parsed) {
+          final code = attr['code']?.toString() ?? '';
+          final label = attr['label']?.toString() ?? code;
+          final rawOptions = attr['options'] as List<dynamic>? ?? [];
+          final options = rawOptions.map((opt) {
+            final optLabel = opt['label']?.toString() ?? '';
+            return ConfigurableOption(
+              value: optLabel,
+              optionId: opt['id'],
+              swatchColor: code == 'color' ? _colorNameToHex(optLabel) : null,
+            );
+          }).toList();
+
+          if (options.isNotEmpty) {
+            attrs.add(
+              ConfigurableAttribute(
+                code: code,
+                label: code == 'size' ? 'Select Size' : label,
+                attributeId: _parseInt(attr['id']),
+                options: options,
+              ),
+            );
+          }
+        }
+        if (attrs.isNotEmpty) return attrs;
+      } catch (e) {
+        developer.log(
+          'configurableAttributes: failed to parse superAttributeOptions: $e',
+          name: 'ProductModel',
+        );
+      }
+    }
+
+    // ── Legacy: derive from superAttributes + variants ──
+    if (variants.isEmpty) return [];
 
     final attrs = <ConfigurableAttribute>[];
+    final declaredCodes = superAttributes
+        .map((a) => a.code)
+        .whereType<String>()
+        .toList();
 
-    // Check which super attribute codes are declared
-    final declaredCodes =
-        superAttributes.map((a) => a.code).whereType<String>().toList();
-
-    // For each declared super attribute, extract unique values from variants
     for (final code in declaredCodes) {
       final values = <String>{};
       for (final variant in variants) {
@@ -131,11 +257,7 @@ class ProductModel {
 
       if (values.isEmpty) continue;
 
-      // Find the admin name from superAttributes
-      final superAttr = superAttributes.firstWhere(
-        (a) => a.code == code,
-      );
-
+      final superAttr = superAttributes.firstWhere((a) => a.code == code);
       final label = code == 'size'
           ? 'Select Size'
           : (superAttr.adminName ?? code);
@@ -147,11 +269,9 @@ class ProductModel {
         );
       }).toList();
 
-      attrs.add(ConfigurableAttribute(
-        code: code,
-        label: label,
-        options: options,
-      ));
+      attrs.add(
+        ConfigurableAttribute(code: code, label: label, options: options),
+      );
     }
 
     return attrs;
@@ -175,11 +295,19 @@ class ProductModel {
     return null;
   }
 
-  /// Get available option values for an attribute given the current selections
-  /// This enables cascading: e.g. selecting "Yellow" color shows only sizes that
-  /// have a Yellow variant
+  /// Get available selection IDs for an attribute given current selections.
+  /// Uses combinations JSON (new API) or variant data (legacy).
+  /// Returns a set of selectionId strings (option IDs or labels).
   Set<String> getAvailableValues(
-      String attributeCode, Map<String, String> otherSelections) {
+    String attributeCode,
+    Map<String, String> otherSelections,
+  ) {
+    // ── New API: use combinations ──
+    if (combinationsJson != null && combinationsJson!.isNotEmpty) {
+      return _getAvailableFromCombinations(attributeCode, otherSelections);
+    }
+
+    // ── Legacy: use variants ──
     final available = <String>{};
     for (final variant in variants) {
       bool matchesOthers = true;
@@ -199,6 +327,83 @@ class ProductModel {
       }
     }
     return available;
+  }
+
+  Set<String> _getAvailableFromCombinations(
+    String attributeCode,
+    Map<String, String> otherSelections,
+  ) {
+    try {
+      final Map<String, dynamic> combos = jsonDecode(combinationsJson!);
+      final available = <String>{};
+
+      for (final combo in combos.values) {
+        final attrs = combo as Map<String, dynamic>;
+        bool matchesOthers = true;
+
+        for (final sel in otherSelections.entries) {
+          if (sel.key == attributeCode) continue;
+          if (attrs[sel.key]?.toString() != sel.value) {
+            matchesOthers = false;
+            break;
+          }
+        }
+
+        if (matchesOthers) {
+          final val = attrs[attributeCode];
+          if (val != null) available.add(val.toString());
+        }
+      }
+      return available;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Get the combination entry for a variant ID.
+  /// Returns e.g. {"color": 2, "size": 8} for variant 11.
+  Map<String, dynamic>? getCombinationForVariant(int variantId) {
+    if (combinationsJson == null) return null;
+    try {
+      final Map<String, dynamic> combos = jsonDecode(combinationsJson!);
+      final entry = combos[variantId.toString()];
+      if (entry is Map<String, dynamic>) return entry;
+    } catch (_) {}
+    return null;
+  }
+
+  /// Find variant ID from combinations JSON using selected option IDs.
+  /// [selectedOptionIds] maps attribute code -> option ID string.
+  /// Returns the variant numeric ID if a match is found.
+  int? findVariantIdFromCombinations(Map<String, String> selectedOptionIds) {
+    if (combinationsJson == null || selectedOptionIds.isEmpty) return null;
+    try {
+      final Map<String, dynamic> combos = jsonDecode(combinationsJson!);
+      for (final entry in combos.entries) {
+        final attrs = entry.value as Map<String, dynamic>;
+        if (attrs.length != selectedOptionIds.length) continue;
+
+        bool matches = true;
+        for (final sel in selectedOptionIds.entries) {
+          if (attrs[sel.key]?.toString() != sel.value) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) return int.tryParse(entry.key);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Resolve the numeric attribute ID for a configurable attribute code.
+  int? getConfigurableAttributeId(String attributeCode) {
+    for (final attribute in configurableAttributes) {
+      if (attribute.code == attributeCode) {
+        return attribute.attributeId;
+      }
+    }
+    return null;
   }
 
   /// Map color name to hex for swatch rendering
@@ -231,17 +436,19 @@ class ProductModel {
   }
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // Debug: log raw price fields from API
+    // Debug: log raw fields from API
     developer.log(
-      'ProductModel[${json['name']}] price=${json['price']} '
-      'specialPrice=${json['specialPrice']} (${json['specialPrice']?.runtimeType}) '
-      'minimumPrice=${json['minimumPrice']}',
+      'ProductModel[${json['name']}] type=${json['type']} '
+      'superAttributeOptions=${json['superAttributeOptions']?.runtimeType} '
+      'combinations=${json['combinations']?.runtimeType} '
+      'variants=${json['variants'] != null ? 'present' : 'null'}',
       name: 'ProductModel',
     );
 
     return ProductModel(
       id: json['id']?.toString() ?? '',
       numericId: json['_id'] as int?,
+      qty: _parseInt(json['qty']),
       sku: json['sku'] as String?,
       type: json['type'] as String?,
       name: json['name'] as String?,
@@ -249,18 +456,41 @@ class ProductModel {
       description: json['description'] as String?,
       shortDescription: json['shortDescription'] as String?,
       price: _parseDouble(json['price']),
+      formattedPrice: json['formattedPrice'] as String?,
       baseImageUrl: json['baseImageUrl'] as String?,
       minimumPrice: _parseDouble(json['minimumPrice']),
+      formattedMinimumPrice: json['formattedMinimumPrice'] as String?,
       specialPrice: _parseSpecialPrice(json['specialPrice']),
+      formattedSpecialPrice: json['formattedSpecialPrice'] as String?,
       isSaleable: _parseBool(json['isSaleable']),
       color: json['color'] as String?,
       size: json['size'] as String?,
       brand: json['brand'] as String?,
+      maximumPrice: _parseDouble(json['maximumPrice']),
+      formattedMaximumPrice: json['formattedMaximumPrice'] as String?,
+      regularMinimumPrice: _parseDouble(json['regularMinimumPrice']),
+      regularMaximumPrice: _parseDouble(json['regularMaximumPrice']),
+      formattedRegularMinimumPrice:
+          json['formattedRegularMinimumPrice'] as String?,
+      formattedRegularMaximumPrice:
+          json['formattedRegularMaximumPrice'] as String?,
+      guestCheckout: _parseBool(json['guestCheckout']),
+      superAttributeOptionsJson: _toJsonString(json['superAttributeOptions']),
+      combinationsJson: _toJsonString(json['combinations']),
+      attributeValues: _parseAttributeValues(json['attributeValues']),
+      categories: _parseCategories(json['categories']),
       images: _parseImages(json['images']),
       superAttributes: _parseSuperAttributes(json['superAttributes']),
       variants: _parseVariants(json['variants']),
       reviews: _parseReviews(json['reviews']),
       relatedProducts: _parseRelatedProducts(json['relatedProducts']),
+      downloadableLinks: _parseDownloadableLinks(json['downloadableLinks']),
+      downloadableSamples: _parseDownloadableSamples(
+        json['downloadableSamples'],
+      ),
+      groupedProducts: _parseGroupedProducts(json['groupedProducts']),
+      bundleOptions: _parseBundleOptions(json['bundleOptions']),
+      bookingProducts: _parseBookingProducts(json['bookingProducts']),
     );
   }
 
@@ -270,6 +500,22 @@ class ProductModel {
     if (value is int) return value.toDouble();
     if (value is String) return double.tryParse(value);
     return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  /// Normalize a value that may be a JSON string, List, or Map into a JSON string.
+  /// Handles GraphQL clients that auto-parse JSON scalar fields.
+  static String? _toJsonString(dynamic value) {
+    if (value == null) return null;
+    if (value is String) return value.isNotEmpty ? value : null;
+    if (value is List || value is Map) return jsonEncode(value);
+    return value.toString();
   }
 
   /// Parse specialPrice — treat "0" or 0 as null (no special price)
@@ -320,8 +566,27 @@ class ProductModel {
     final edges = json['edges'] as List<dynamic>?;
     if (edges == null) return [];
     return edges
-        .map((e) =>
-            SuperAttribute.fromJson(e['node'] as Map<String, dynamic>))
+        .map((e) => SuperAttribute.fromJson(e['node'] as Map<String, dynamic>))
+        .toList();
+  }
+
+  static List<AttributeValueItem> _parseAttributeValues(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map(
+          (e) => AttributeValueItem.fromJson(e['node'] as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  static List<ProductCategory> _parseCategories(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map((e) => ProductCategory.fromJson(e['node'] as Map<String, dynamic>))
         .toList();
   }
 
@@ -333,6 +598,469 @@ class ProductModel {
         .map((e) => ProductModel.fromJson(e['node'] as Map<String, dynamic>))
         .toList();
   }
+
+  static List<DownloadableLink> _parseDownloadableLinks(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map(
+          (e) => DownloadableLink.fromJson(e['node'] as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  static List<DownloadableSample> _parseDownloadableSamples(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map(
+          (e) => DownloadableSample.fromJson(e['node'] as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  static List<GroupedProductItem> _parseGroupedProducts(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map(
+          (e) => GroupedProductItem.fromJson(e['node'] as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  static List<BundleOption> _parseBundleOptions(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map((e) => BundleOption.fromJson(e['node'] as Map<String, dynamic>))
+        .toList();
+  }
+
+  static List<BookingProductData> _parseBookingProducts(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map(
+          (e) => BookingProductData.fromJson(e['node'] as Map<String, dynamic>),
+        )
+        .toList();
+  }
+}
+
+class GroupedProductItem {
+  final String id;
+  final int? qty;
+  final int? sortOrder;
+  final ProductModel? associatedProduct;
+
+  const GroupedProductItem({
+    required this.id,
+    this.qty,
+    this.sortOrder,
+    this.associatedProduct,
+  });
+
+  factory GroupedProductItem.fromJson(Map<String, dynamic> json) {
+    final associated = json['associatedProduct'] as Map<String, dynamic>?;
+    return GroupedProductItem(
+      id: json['id']?.toString() ?? '',
+      qty: ProductModel._parseInt(json['qty']),
+      sortOrder: ProductModel._parseInt(json['sortOrder']),
+      associatedProduct: associated != null
+          ? ProductModel.fromJson(associated)
+          : null,
+    );
+  }
+}
+
+class BundleOption {
+  final String id;
+  final String? type;
+  final bool isRequired;
+  final int? sortOrder;
+  final String? label;
+  final List<BundleOptionProduct> bundleOptionProducts;
+
+  const BundleOption({
+    required this.id,
+    this.type,
+    this.isRequired = false,
+    this.sortOrder,
+    this.label,
+    this.bundleOptionProducts = const [],
+  });
+
+  factory BundleOption.fromJson(Map<String, dynamic> json) {
+    final translation = json['translation'] as Map<String, dynamic>?;
+    return BundleOption(
+      id: json['id']?.toString() ?? '',
+      type: json['type'] as String?,
+      isRequired: ProductModel._parseBool(json['isRequired']) ?? false,
+      sortOrder: ProductModel._parseInt(json['sortOrder']),
+      label: translation?['label'] as String?,
+      bundleOptionProducts: _parseBundleOptionProducts(
+        json['bundleOptionProducts'],
+      ),
+    );
+  }
+
+  static List<BundleOptionProduct> _parseBundleOptionProducts(dynamic json) {
+    if (json == null) return [];
+    final edges = json['edges'] as List<dynamic>?;
+    if (edges == null) return [];
+    return edges
+        .map(
+          (e) =>
+              BundleOptionProduct.fromJson(e['node'] as Map<String, dynamic>),
+        )
+        .toList();
+  }
+}
+
+class BundleOptionProduct {
+  final String id;
+  final int? qty;
+  final bool isDefault;
+  final bool isUserDefined;
+  final int? sortOrder;
+  final ProductModel? product;
+
+  const BundleOptionProduct({
+    required this.id,
+    this.qty,
+    this.isDefault = false,
+    this.isUserDefined = false,
+    this.sortOrder,
+    this.product,
+  });
+
+  factory BundleOptionProduct.fromJson(Map<String, dynamic> json) {
+    final productJson = json['product'] as Map<String, dynamic>?;
+    return BundleOptionProduct(
+      id: json['id']?.toString() ?? '',
+      qty: ProductModel._parseInt(json['qty']),
+      isDefault: ProductModel._parseBool(json['isDefault']) ?? false,
+      isUserDefined: ProductModel._parseBool(json['isUserDefined']) ?? false,
+      sortOrder: ProductModel._parseInt(json['sortOrder']),
+      product: productJson != null ? ProductModel.fromJson(productJson) : null,
+    );
+  }
+}
+
+class BookingProductData {
+  final String id;
+  final int? numericId;
+  final String? type;
+  final int qty;
+  final String? location;
+  final bool showLocation;
+  final String? availableFrom;
+  final String? availableTo;
+  final BookingSlotData? defaultSlot;
+  final BookingSlotData? appointmentSlot;
+  final BookingSlotData? rentalSlot;
+  final BookingSlotData? tableSlot;
+  final List<BookingEventTicket> eventTickets;
+
+  const BookingProductData({
+    required this.id,
+    this.numericId,
+    this.type,
+    this.qty = 1,
+    this.location,
+    this.showLocation = false,
+    this.availableFrom,
+    this.availableTo,
+    this.defaultSlot,
+    this.appointmentSlot,
+    this.rentalSlot,
+    this.tableSlot,
+    this.eventTickets = const [],
+  });
+
+  factory BookingProductData.fromJson(Map<String, dynamic> json) {
+    return BookingProductData(
+      id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
+      numericId: ProductModel._parseInt(json['_id']),
+      type: json['type']?.toString(),
+      qty: ProductModel._parseInt(json['qty']) ?? 1,
+      location: json['location']?.toString(),
+      showLocation: ProductModel._parseBool(json['showLocation']) ?? false,
+      availableFrom: json['availableFrom']?.toString(),
+      availableTo: json['availableTo']?.toString(),
+      defaultSlot: BookingSlotData.fromDynamic(json['defaultSlot']),
+      appointmentSlot: BookingSlotData.fromDynamic(json['appointmentSlot']),
+      rentalSlot: BookingSlotData.fromDynamic(json['rentalSlot']),
+      tableSlot: BookingSlotData.fromDynamic(json['tableSlot']),
+      eventTickets: BookingEventTicket.parseList(json['eventTickets']),
+    );
+  }
+
+  BookingSlotData? get activeSlot {
+    switch ((type ?? '').toLowerCase().trim()) {
+      case 'default':
+        return defaultSlot;
+      case 'appointment':
+        return appointmentSlot;
+      case 'rental':
+        return rentalSlot;
+      case 'table':
+        return tableSlot;
+      default:
+        return null;
+    }
+  }
+}
+
+class BookingSlotData {
+  final String? id;
+  final int? numericId;
+  final int? bookingProductId;
+  final String? bookingType;
+  final int? duration;
+  final int? breakTime;
+  final String? rentingType;
+  final double? dailyPrice;
+  final double? hourlyPrice;
+  final dynamic slots;
+
+  const BookingSlotData({
+    this.id,
+    this.numericId,
+    this.bookingProductId,
+    this.bookingType,
+    this.duration,
+    this.breakTime,
+    this.rentingType,
+    this.dailyPrice,
+    this.hourlyPrice,
+    this.slots,
+  });
+
+  factory BookingSlotData.fromJson(Map<String, dynamic> json) {
+    return BookingSlotData(
+      id: json['id']?.toString(),
+      numericId: ProductModel._parseInt(json['_id']),
+      bookingProductId: ProductModel._parseInt(json['bookingProductId']),
+      bookingType: json['bookingType']?.toString(),
+      duration: ProductModel._parseInt(json['duration']),
+      breakTime: ProductModel._parseInt(json['breakTime']),
+      rentingType: json['rentingType']?.toString(),
+      dailyPrice: ProductModel._parseDouble(json['dailyPrice']),
+      hourlyPrice: ProductModel._parseDouble(json['hourlyPrice']),
+      slots: json['slots'],
+    );
+  }
+
+  static BookingSlotData? fromDynamic(dynamic value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) {
+      return BookingSlotData.fromJson(value);
+    }
+    return null;
+  }
+
+  List<String> slotRanges() {
+    return _extractSlotRanges(slots);
+  }
+
+  int get resolvedBookingId =>
+      bookingProductId ?? numericId ?? int.tryParse(id ?? '') ?? 0;
+
+  static List<String> _extractSlotRanges(dynamic source) {
+    if (source == null) return const [];
+
+    if (source is String) {
+      final trimmed = source.trim();
+      if (trimmed.isEmpty) return const [];
+      try {
+        final decoded = jsonDecode(trimmed);
+        return _extractSlotRanges(decoded);
+      } catch (_) {
+        return trimmed
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+    }
+
+    if (source is List) {
+      final values = <String>[];
+      for (final item in source) {
+        values.addAll(_extractSlotRanges(item));
+      }
+      return values.toSet().toList();
+    }
+
+    if (source is Map) {
+      if (source.containsKey('from') && source.containsKey('to')) {
+        final from = source['from']?.toString();
+        final to = source['to']?.toString();
+        if ((from ?? '').isNotEmpty && (to ?? '').isNotEmpty) {
+          return ['${from!} - ${to!}'];
+        }
+      }
+
+      final values = <String>[];
+      for (final entryValue in source.values) {
+        values.addAll(_extractSlotRanges(entryValue));
+      }
+      return values.toSet().toList();
+    }
+
+    return const [];
+  }
+}
+
+class BookingSlotOption {
+  final int slotId;
+  final String label;
+  final String? from;
+  final String? to;
+  final String? time;
+  final String? timestamp;
+  final int? qty;
+
+  const BookingSlotOption({
+    required this.slotId,
+    required this.label,
+    this.from,
+    this.to,
+    this.time,
+    this.timestamp,
+    this.qty,
+  });
+
+  factory BookingSlotOption.fromStandardJson(Map<String, dynamic> json) {
+    final from = json['from']?.toString().trim();
+    final to = json['to']?.toString().trim();
+    return BookingSlotOption(
+      slotId: ProductModel._parseInt(json['slotId']) ?? 0,
+      from: from,
+      to: to,
+      timestamp: json['timestamp']?.toString(),
+      qty: ProductModel._parseInt(json['qty']),
+      label: [
+        if ((from ?? '').isNotEmpty) from,
+        if ((to ?? '').isNotEmpty) to,
+      ].join(' - '),
+    );
+  }
+
+  static List<BookingSlotOption> fromRentalSummaryJson(
+    Map<String, dynamic> json,
+  ) {
+    final slotId = ProductModel._parseInt(json['slotId']) ?? 0;
+    final time = json['time']?.toString().trim();
+    final slots = BookingSlotData._extractSlotRanges(json['slots']);
+    final labels = slots.isNotEmpty
+        ? slots
+        : <String>[(time ?? '').isNotEmpty ? time! : 'Slot $slotId'];
+
+    return labels
+        .map(
+          (label) =>
+              BookingSlotOption(slotId: slotId, time: time, label: label),
+        )
+        .toList();
+  }
+}
+
+class BookingEventTicket {
+  final String id;
+  final int? numericId;
+  final int? bookingProductId;
+  final double? price;
+  final String? formattedPrice;
+  final int qty;
+  final double? specialPrice;
+  final String? formattedSpecialPrice;
+  final String? name;
+  final String? description;
+
+  const BookingEventTicket({
+    required this.id,
+    this.numericId,
+    this.bookingProductId,
+    this.price,
+    this.formattedPrice,
+    this.qty = 0,
+    this.specialPrice,
+    this.formattedSpecialPrice,
+    this.name,
+    this.description,
+  });
+
+  factory BookingEventTicket.fromJson(Map<String, dynamic> json) {
+    return BookingEventTicket(
+      id: json['id']?.toString() ?? '',
+      numericId: ProductModel._parseInt(json['_id']),
+      bookingProductId: ProductModel._parseInt(json['bookingProductId']),
+      price: ProductModel._parseDouble(json['price']),
+      formattedPrice: json['formattedPrice'] as String?,
+      qty: ProductModel._parseInt(json['qty']) ?? 0,
+      specialPrice: ProductModel._parseSpecialPrice(json['specialPrice']),
+      formattedSpecialPrice: json['formattedSpecialPrice'] as String?,
+      name: json['name']?.toString(),
+      description: json['description']?.toString(),
+    );
+  }
+
+  static List<BookingEventTicket> parseList(dynamic json) {
+    if (json == null) return const [];
+
+    if (json is Map<String, dynamic>) {
+      final edges = json['edges'] as List<dynamic>?;
+      if (edges == null) return const [];
+      return edges
+          .map(
+            (e) =>
+                BookingEventTicket.fromJson(e['node'] as Map<String, dynamic>),
+          )
+          .toList();
+    }
+
+    if (json is List) {
+      return json
+          .whereType<Map<String, dynamic>>()
+          .map(BookingEventTicket.fromJson)
+          .toList();
+    }
+
+    return const [];
+  }
+
+  int get resolvedId => bookingProductId ?? numericId ?? int.tryParse(id) ?? 0;
+
+  String get displayPriceLabel {
+    if (specialPrice != null &&
+        specialPrice! > 0 &&
+        (formattedSpecialPrice?.isNotEmpty ?? false)) {
+      return formattedSpecialPrice!;
+    }
+    if (formattedPrice?.isNotEmpty ?? false) {
+      return formattedPrice!;
+    }
+    return '';
+  }
+
+  String? get originalPriceLabel {
+    if (specialPrice != null &&
+        specialPrice! > 0 &&
+        price != null &&
+        specialPrice! < price! &&
+        (formattedPrice?.isNotEmpty ?? false)) {
+      return formattedPrice;
+    }
+    return null;
+  }
 }
 
 class ProductVariant {
@@ -341,11 +1069,16 @@ class ProductVariant {
   final String? sku;
   final String? name;
   final double? price;
+  final String? formattedPrice;
   final double? specialPrice;
+  final String? formattedSpecialPrice;
   final String? baseImageUrl;
   final String? isSaleable;
   final String? color;
   final String? size;
+
+  /// Attribute values from new API (code -> label, e.g. "color" -> "Blue")
+  final Map<String, String> attributeValuesMap;
 
   const ProductVariant({
     required this.id,
@@ -353,30 +1086,62 @@ class ProductVariant {
     this.sku,
     this.name,
     this.price,
+    this.formattedPrice,
     this.specialPrice,
+    this.formattedSpecialPrice,
     this.baseImageUrl,
     this.isSaleable,
     this.color,
     this.size,
+    this.attributeValuesMap = const {},
   });
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) {
+    // Parse attributeValues edges into a code -> value map
+    final attrMap = <String, String>{};
+    final attrValues = json['attributeValues'];
+    if (attrValues != null) {
+      final edges = attrValues['edges'] as List<dynamic>?;
+      if (edges != null) {
+        for (final edge in edges) {
+          final node = edge['node'] as Map<String, dynamic>?;
+          if (node == null) continue;
+          final value = node['value']?.toString();
+          final attribute = node['attribute'] as Map<String, dynamic>?;
+          final code = attribute?['code']?.toString();
+          if (code != null &&
+              code.isNotEmpty &&
+              value != null &&
+              value.isNotEmpty) {
+            attrMap[code] = value;
+          }
+        }
+      }
+    }
+
     return ProductVariant(
       id: json['id']?.toString() ?? '',
       numericId: json['_id'] as int?,
       sku: json['sku'] as String?,
       name: json['name'] as String?,
       price: ProductModel._parseDouble(json['price']),
+      formattedPrice: json['formattedPrice'] as String?,
       specialPrice: ProductModel._parseSpecialPrice(json['specialPrice']),
+      formattedSpecialPrice: json['formattedSpecialPrice'] as String?,
       baseImageUrl: json['baseImageUrl'] as String?,
       isSaleable: json['isSaleable'] as String?,
-      color: json['color'] as String?,
-      size: json['size'] as String?,
+      color: json['color'] as String? ?? attrMap['color'],
+      size: json['size'] as String? ?? attrMap['size'],
+      attributeValuesMap: attrMap,
     );
   }
 
-  /// Get attribute value by code (e.g. 'color' -> 'Yellow')
+  /// Get attribute value by code (e.g. 'color' -> 'Blue')
+  /// Checks new attributeValuesMap first, falls back to legacy fields.
   String? getAttributeValue(String code) {
+    if (attributeValuesMap.containsKey(code)) {
+      return attributeValuesMap[code];
+    }
     switch (code) {
       case 'color':
         return color;
@@ -391,6 +1156,36 @@ class ProductVariant {
   double get displayPrice {
     if (specialPrice != null && specialPrice! > 0) return specialPrice!;
     return price ?? 0;
+  }
+
+  double? get originalPrice {
+    if (specialPrice != null &&
+        specialPrice! > 0 &&
+        price != null &&
+        specialPrice! < price!) {
+      return price;
+    }
+    return null;
+  }
+
+  String get displayPriceLabel {
+    if (specialPrice != null &&
+        specialPrice! > 0 &&
+        (formattedSpecialPrice?.isNotEmpty ?? false)) {
+      return formattedSpecialPrice!;
+    }
+    if (formattedPrice?.isNotEmpty ?? false) {
+      return formattedPrice!;
+    }
+    return '';
+  }
+
+  String? get originalPriceLabel {
+    if (originalPrice == null) return null;
+    if (formattedPrice?.isNotEmpty ?? false) {
+      return formattedPrice;
+    }
+    return null;
   }
 }
 
@@ -467,12 +1262,14 @@ class ProductImage {
 /// Super attribute (e.g., size, color) with options
 class SuperAttribute {
   final String id;
+  final int? numericId;
   final String? code;
   final String? adminName;
   final List<AttributeOption> options;
 
   const SuperAttribute({
     required this.id,
+    this.numericId,
     this.code,
     this.adminName,
     this.options = const [],
@@ -481,6 +1278,7 @@ class SuperAttribute {
   factory SuperAttribute.fromJson(Map<String, dynamic> json) {
     return SuperAttribute(
       id: json['id']?.toString() ?? '',
+      numericId: json['_id'] as int?,
       code: json['code'] as String?,
       adminName: json['adminName'] as String?,
       options: _parseOptions(json['options']),
@@ -492,8 +1290,7 @@ class SuperAttribute {
     final edges = json['edges'] as List<dynamic>?;
     if (edges == null) return [];
     return edges
-        .map((e) =>
-            AttributeOption.fromJson(e['node'] as Map<String, dynamic>))
+        .map((e) => AttributeOption.fromJson(e['node'] as Map<String, dynamic>))
         .toList();
   }
 }
@@ -539,31 +1336,76 @@ class AttributeOption {
       swatchValue!.startsWith('#');
 }
 
-/// Configurable attribute derived from variants
-/// Since superAttributes.options returns null, we build options from variant data
+/// Configurable attribute from superAttributeOptions or legacy superAttributes
 class ConfigurableAttribute {
   final String code; // e.g. "color", "size"
   final String label; // e.g. "Color", "Select Size"
+  final int?
+  attributeId; // attribute ID from superAttributeOptions (for cart payload)
   final List<ConfigurableOption> options;
 
   const ConfigurableAttribute({
     required this.code,
     required this.label,
+    this.attributeId,
     this.options = const [],
   });
 }
 
-/// An option for a configurable attribute, derived from variants
+/// An option for a configurable attribute
 class ConfigurableOption {
-  final String value; // e.g. "Yellow", "S"
+  final String value; // option label: "Blue", "S"
+  final dynamic optionId; // API option id (int) for use with combinations
   final String? swatchColor; // hex color for color swatches
   final bool isAvailable;
 
   const ConfigurableOption({
     required this.value,
+    this.optionId,
     this.swatchColor,
     this.isAvailable = true,
   });
+
+  /// Selection identifier — option ID when available (new API), label otherwise (legacy)
+  String get selectionId => optionId?.toString() ?? value;
+}
+
+/// Attribute value from product-level attributeValues field
+class AttributeValueItem {
+  final String? value;
+  final String? attributeCode;
+  final String? attributeAdminName;
+
+  const AttributeValueItem({
+    this.value,
+    this.attributeCode,
+    this.attributeAdminName,
+  });
+
+  factory AttributeValueItem.fromJson(Map<String, dynamic> json) {
+    final attribute = json['attribute'] as Map<String, dynamic>?;
+    return AttributeValueItem(
+      value: json['value']?.toString(),
+      attributeCode: attribute?['code']?.toString(),
+      attributeAdminName: attribute?['adminName']?.toString(),
+    );
+  }
+}
+
+/// Product category
+class ProductCategory {
+  final String id;
+  final String? name;
+
+  const ProductCategory({required this.id, this.name});
+
+  factory ProductCategory.fromJson(Map<String, dynamic> json) {
+    final translation = json['translation'] as Map<String, dynamic>?;
+    return ProductCategory(
+      id: json['id']?.toString() ?? '',
+      name: translation?['name'] as String?,
+    );
+  }
 }
 
 /// Pagination info model matching GraphQL pageInfo
@@ -612,6 +1454,95 @@ class PaginatedProducts {
       products: edges
           .map((e) => ProductModel.fromJson(e['node'] as Map<String, dynamic>))
           .toList(),
+    );
+  }
+}
+
+class DownloadableLink {
+  final String id;
+  final int? numericId;
+  final String? type;
+  final double? price;
+  final String? formattedPrice;
+  final int? downloads;
+  final int? sortOrder;
+  final String? fileUrl;
+  final String? sampleFileUrl;
+  final String? title;
+
+  const DownloadableLink({
+    required this.id,
+    this.numericId,
+    this.type,
+    this.price,
+    this.formattedPrice,
+    this.downloads,
+    this.sortOrder,
+    this.fileUrl,
+    this.sampleFileUrl,
+    this.title,
+  });
+
+  factory DownloadableLink.fromJson(Map<String, dynamic> json) {
+    String? title;
+    final translation = json['translation'];
+    if (translation != null && translation is Map<String, dynamic>) {
+      title = translation['title'] as String?;
+    }
+
+    return DownloadableLink(
+      id: json['id']?.toString() ?? '',
+      numericId: json['_id'] as int?,
+      type: json['type'] as String?,
+      price: ProductModel._parseDouble(json['price']),
+      formattedPrice: json['formattedPrice'] as String?,
+      downloads: json['downloads'] as int?,
+      sortOrder: json['sortOrder'] as int?,
+      fileUrl: json['fileUrl'] as String?,
+      sampleFileUrl: json['sampleFileUrl'] as String?,
+      title: title,
+    );
+  }
+
+  String? get displayPriceLabel {
+    if (price != null && price! > 0 && (formattedPrice?.isNotEmpty ?? false)) {
+      return formattedPrice;
+    }
+    return null;
+  }
+}
+
+class DownloadableSample {
+  final String id;
+  final int? numericId;
+  final String? type;
+  final String? fileUrl;
+  final int? sortOrder;
+  final String? title;
+
+  const DownloadableSample({
+    required this.id,
+    this.numericId,
+    this.type,
+    this.fileUrl,
+    this.sortOrder,
+    this.title,
+  });
+
+  factory DownloadableSample.fromJson(Map<String, dynamic> json) {
+    String? title;
+    final translation = json['translation'];
+    if (translation != null && translation is Map<String, dynamic>) {
+      title = translation['title'] as String?;
+    }
+
+    return DownloadableSample(
+      id: json['id']?.toString() ?? '',
+      numericId: json['_id'] as int?,
+      type: json['type'] as String?,
+      fileUrl: json['fileUrl'] as String?,
+      sortOrder: json['sortOrder'] as int?,
+      title: title,
     );
   }
 }

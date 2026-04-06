@@ -2,6 +2,62 @@
 /// Ported from: nextjs-commerce-main/src/graphql/catelog/
 library;
 
+class StoreConfigQueries {
+  /// Fetches the configured Bagisto channel with its locales, currencies,
+  /// and defaults used during app startup.
+  static const String getChannelById = r'''
+    query getChannelByID($id: ID!) {
+      channel(id: $id) {
+        id
+        _id
+        code
+        hostname
+        theme
+        timezone
+        homeSeo
+        logoUrl
+        faviconUrl
+        locales {
+          edges {
+            node {
+              id
+              _id
+              code
+              name
+              direction
+            }
+          }
+        }
+        currencies {
+          edges {
+            node {
+              id
+              _id
+              code
+              name
+              symbol
+            }
+          }
+        }
+        defaultLocale {
+          id
+          _id
+          code
+          name
+          direction
+        }
+        baseCurrency {
+          id
+          _id
+          code
+          name
+          symbol
+        }
+      }
+    }
+  ''';
+}
+
 class CategoryQueries {
   /// GET_TREE_CATEGORIES – fetches hierarchical category tree
   /// Source: nextjs-commerce/src/graphql/catelog/queries/Category.ts
@@ -80,10 +136,13 @@ class ProductQueries {
       type
       name
       price
+      formattedPrice
       urlKey
       baseImageUrl
       minimumPrice
+      formattedMinimumPrice
       specialPrice
+      formattedSpecialPrice
       isSaleable
        reviews {
        totalCount
@@ -112,8 +171,11 @@ class ProductQueries {
       type
       baseImageUrl
       price
+      formattedPrice
       minimumPrice
+      formattedMinimumPrice
       specialPrice
+      formattedSpecialPrice
       isSaleable
        reviews {
        totalCount
@@ -127,6 +189,566 @@ class ProductQueries {
             createdAt
           }
         }
+      }
+    }
+  ''';
+
+  /// Product detailed common fragment (shared by all product types)
+  static const String _productDetailedCommonFragment = r'''
+    fragment ProductDetailedCommon on Product {
+      id
+      _id
+      sku
+      type
+      name
+      urlKey
+      description
+      shortDescription
+      price
+      formattedPrice
+      baseImageUrl
+      minimumPrice
+      formattedMinimumPrice
+      specialPrice
+      formattedSpecialPrice
+      maximumPrice
+      formattedMaximumPrice
+      regularMinimumPrice
+      regularMaximumPrice
+      formattedRegularMinimumPrice
+      formattedRegularMaximumPrice
+      isSaleable
+      guestCheckout
+      color
+      size
+      brand
+      images {
+        edges {
+          node {
+            id
+            _id
+            path
+            publicPath
+            type
+            position
+          }
+        }
+      }
+      reviews {
+        edges {
+          node {
+            rating
+            id
+            name
+            title
+            comment
+            createdAt
+          }
+        }
+      }
+      relatedProducts {
+        edges {
+          node {
+            id
+            _id
+            sku
+            name
+            urlKey
+            type
+            baseImageUrl
+            price
+            formattedPrice
+            minimumPrice
+            formattedMinimumPrice
+            specialPrice
+            formattedSpecialPrice
+            isSaleable
+          }
+        }
+      }
+    }
+  ''';
+
+  static const String _configurableDetailedFields = r'''
+      superAttributeOptions
+      combinations
+      attributeValues {
+        edges {
+          node {
+            value
+            attribute {
+              code
+              adminName
+            }
+          }
+        }
+      }
+      variants {
+        edges {
+          node {
+            id
+            name
+            sku
+            price
+            attributeValues {
+              edges {
+                node {
+                  value
+                  attribute {
+                    code
+                    adminName
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      categories {
+        edges {
+          node {
+            id
+            translation {
+              name
+            }
+          }
+        }
+      }
+  ''';
+
+  static const String _downloadableDetailedFields = r'''
+      downloadableLinks {
+        edges {
+          node {
+            id
+            _id
+            type
+            price
+            formattedPrice
+            downloads
+            sortOrder
+            fileUrl
+            sampleFileUrl
+            translation {
+              title
+            }
+          }
+        }
+      }
+      downloadableSamples {
+        edges {
+          node {
+            id
+            _id
+            type
+            fileUrl
+            sortOrder
+            translation {
+              title
+            }
+          }
+        }
+      }
+  ''';
+
+  static const String _groupedDetailedFields = r'''
+      groupedProducts {
+        edges {
+          node {
+            id
+            qty
+            sortOrder
+            associatedProduct {
+              id
+              name
+              sku
+              price
+              formattedPrice
+              specialPrice
+              formattedSpecialPrice
+              images(first: 3) {
+                edges {
+                  node {
+                    id
+                    publicPath
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+  ''';
+
+  static const String _bundleDetailedFields = r'''
+      bundleOptions {
+        edges {
+          node {
+            id
+            type
+            isRequired
+            sortOrder
+            translation {
+              label
+            }
+            bundleOptionProducts {
+              edges {
+                node {
+                  id
+                  qty
+                  isDefault
+                  isUserDefined
+                  sortOrder
+                  product {
+                    id
+                    name
+                    sku
+                    price
+                    formattedPrice
+                    images(first: 3) {
+                      edges {
+                        node {
+                          id
+                          publicPath
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+  ''';
+
+  static const String _bookingDetailedFields = r'''
+      bookingProducts {
+        edges {
+          node {
+            id
+            _id
+            type
+            qty
+            location
+            showLocation
+            availableFrom
+            availableTo
+            defaultSlot {
+              id
+              _id
+              bookingType
+              duration
+              breakTime
+              slots
+            }
+            appointmentSlot {
+              id
+              _id
+              bookingProductId
+              duration
+              breakTime
+              sameSlotAllDays
+              slots
+            }
+            rentalSlot {
+              id
+              _id
+              bookingProductId
+              rentingType
+              dailyPrice
+              hourlyPrice
+              sameSlotAllDays
+              slots
+            }
+            tableSlot {
+              id
+              _id
+              bookingProductId
+              priceType
+              guestLimit
+              duration
+              breakTime
+              preventSchedulingBefore
+              sameSlotAllDays
+              slots
+            }
+            eventTickets {
+              edges {
+                node {
+                  id
+                  _id
+                  bookingProductId
+                  price
+                  formattedPrice
+                  qty
+                  specialPrice
+                  formattedSpecialPrice
+                  specialPriceFrom
+                  specialPriceTo
+                }
+              }
+            }
+          }
+        }
+      }
+  ''';
+
+  static String _typeSpecificDetailedFields(String? productType) {
+    final normalized = (productType ?? '').toLowerCase().trim();
+    switch (normalized) {
+      case 'simple':
+      case 'virtual':
+        return '';
+      case 'configurable':
+      case 'variable':
+        return _configurableDetailedFields;
+      case 'downloadable':
+        return _downloadableDetailedFields;
+      case 'grouped':
+        return _groupedDetailedFields;
+      case 'bundle':
+        return _bundleDetailedFields;
+      case 'booking':
+        return _bookingDetailedFields;
+      default:
+        // Unknown type: keep backward-compatible full payload.
+        return _configurableDetailedFields +
+            _downloadableDetailedFields +
+            _groupedDetailedFields +
+            _bundleDetailedFields +
+            _bookingDetailedFields;
+    }
+  }
+
+  /// Type-optimized product detail query by URL key.
+  static String getProductByUrlKeyByType(String? productType) {
+    final normalized = (productType ?? '').toLowerCase().trim();
+    if (normalized == 'booking') {
+      return getBookingProductByUrlKeyForType('default');
+    }
+
+    final typeFields = _typeSpecificDetailedFields(productType);
+    return '''
+    $_productDetailedCommonFragment
+
+    query GetProductByUrlKey(\$urlKey: String!) {
+      product(urlKey: \$urlKey) {
+        ...ProductDetailedCommon
+        $typeFields
+      }
+    }
+  ''';
+  }
+
+  static const String _bookingProductCoreFields = r'''
+      id
+      _id
+      sku
+      type
+      name
+      urlKey
+      description
+      shortDescription
+      price
+      formattedPrice
+      baseImageUrl
+      minimumPrice
+      formattedMinimumPrice
+      specialPrice
+      formattedSpecialPrice
+      isSaleable
+      images {
+        edges {
+          node {
+            id
+            _id
+            path
+            publicPath
+            type
+            position
+          }
+        }
+      }
+  ''';
+
+  static const String _bookingTypeProbeFields = r'''
+      bookingProducts {
+        edges {
+          node {
+            _id
+            type
+          }
+        }
+      }
+  ''';
+
+  static const String _bookingCommonNodeFields = r'''
+            _id
+            type
+            qty
+            location
+            showLocation
+            availableFrom
+            availableTo
+  ''';
+
+  static String _bookingSlotFieldsForType(String bookingType) {
+    switch (bookingType.toLowerCase().trim()) {
+      case 'appointment':
+        return r'''
+            appointmentSlot {
+              id
+              _id
+              bookingProductId
+              duration
+              breakTime
+              sameSlotAllDays
+              slots
+            }
+        ''';
+      case 'rental':
+        return r'''
+            rentalSlot {
+              id
+              _id
+              bookingProductId
+              rentingType
+              dailyPrice
+              hourlyPrice
+              sameSlotAllDays
+              slots
+            }
+        ''';
+      case 'table':
+        return r'''
+            tableSlot {
+              id
+              _id
+              bookingProductId
+              priceType
+              guestLimit
+              duration
+              breakTime
+              preventSchedulingBefore
+              sameSlotAllDays
+              slots
+            }
+        ''';
+      case 'event':
+        return r'''
+            eventTickets {
+              edges {
+                node {
+                  id
+                  _id
+                  bookingProductId
+                  price
+                  formattedPrice
+                  qty
+                  specialPrice
+                  formattedSpecialPrice
+                  specialPriceFrom
+                  specialPriceTo
+                }
+              }
+            }
+        ''';
+      case 'default':
+      default:
+        return r'''
+            defaultSlot {
+              id
+              _id
+              bookingType
+              duration
+              breakTime
+              slots
+            }
+        ''';
+    }
+  }
+
+  static String getBookingProductTypeByUrlKey =
+      '''
+    query GetBookingProductTypeByUrlKey(\$urlKey: String!) {
+      product(urlKey: \$urlKey) {
+$_bookingTypeProbeFields
+      }
+    }
+  ''';
+
+  static String getBookingProductTypeById =
+      '''
+    query GetBookingProductTypeById(\$id: ID!) {
+      product(id: \$id) {
+$_bookingTypeProbeFields
+      }
+    }
+  ''';
+
+  static String getBookingProductByUrlKeyForType(String bookingType) {
+    final slotFields = _bookingSlotFieldsForType(bookingType);
+    return '''
+    query GetBookingProductByUrlKeyForType(\$urlKey: String!) {
+      product(urlKey: \$urlKey) {
+$_bookingProductCoreFields
+        bookingProducts {
+          edges {
+            node {
+$_bookingCommonNodeFields
+$slotFields
+            }
+          }
+        }
+      }
+    }
+  ''';
+  }
+
+  static String getBookingProductByIdForType(String bookingType) {
+    final slotFields = _bookingSlotFieldsForType(bookingType);
+    return '''
+    query GetBookingProductByIdForType(\$id: ID!) {
+      product(id: \$id) {
+$_bookingProductCoreFields
+        bookingProducts {
+          edges {
+            node {
+$_bookingCommonNodeFields
+$slotFields
+            }
+          }
+        }
+      }
+    }
+  ''';
+  }
+
+  static const String getBookingSlots = r'''
+    query GetBookingSlots(
+      $id: Int!
+      $date: String!
+    ) {
+      bookingSlots(id: $id, date: $date) {
+        slotId
+        from
+        to
+        timestamp
+        qty
+      }
+    }
+  ''';
+
+  static const String getBookingRentalHourlySlots = r'''
+    query GetBookingSlotsSummary(
+      $id: Int!
+      $date: String!
+    ) {
+      bookingSlots(id: $id, date: $date) {
+        slotId
+        time
+        slots
       }
     }
   ''';
@@ -146,7 +768,14 @@ class ProductQueries {
       baseImageUrl
       minimumPrice
       specialPrice
+      maximumPrice
+      formattedMaximumPrice
+      regularMinimumPrice
+      regularMaximumPrice
+      formattedRegularMinimumPrice
+      formattedRegularMaximumPrice
       isSaleable
+      guestCheckout
       color
       size
       brand
@@ -162,25 +791,15 @@ class ProductQueries {
           }
         }
       }
-      superAttributes {
+      superAttributeOptions
+      combinations
+      attributeValues {
         edges {
           node {
-            id
-            code
-            adminName
-            options {
-              edges {
-                node {
-                  id
-                  _id
-                  adminName
-                  swatchValue
-                  swatchValueUrl
-                  translation {
-                    label
-                  }
-                }
-              }
+            value
+            attribute {
+              code
+              adminName
             }
           }
         }
@@ -189,15 +808,30 @@ class ProductQueries {
         edges {
           node {
             id
-            _id
-            sku
             name
+            sku
             price
-            specialPrice
-            baseImageUrl
-            isSaleable
-            color
-            size
+            attributeValues {
+              edges {
+                node {
+                  value
+                  attribute {
+                    code
+                    adminName
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      categories {
+        edges {
+          node {
+            id
+            translation {
+              name
+            }
           }
         }
       }
@@ -227,6 +861,166 @@ class ProductQueries {
             minimumPrice
             specialPrice
             isSaleable
+          }
+        }
+      }
+      downloadableLinks {
+        edges {
+          node {
+            id
+            _id
+            type
+            price
+            downloads
+            sortOrder
+            fileUrl
+            sampleFileUrl
+            translation {
+              title
+            }
+          }
+        }
+      }
+      downloadableSamples {
+        edges {
+          node {
+            id
+            _id
+            type
+            fileUrl
+            sortOrder
+            translation {
+              title
+            }
+          }
+        }
+      }
+      groupedProducts {
+        edges {
+          node {
+            id
+            qty
+            sortOrder
+            associatedProduct {
+              id
+              name
+              sku
+              price
+              specialPrice
+              images(first: 3) {
+                edges {
+                  node {
+                    id
+                    publicPath
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      bundleOptions {
+        edges {
+          node {
+            id
+            type
+            isRequired
+            sortOrder
+            translation {
+              label
+            }
+            bundleOptionProducts {
+              edges {
+                node {
+                  id
+                  qty
+                  isDefault
+                  isUserDefined
+                  sortOrder
+                  product {
+                    id
+                    name
+                    sku
+                    price
+                    images(first: 3) {
+                      edges {
+                        node {
+                          id
+                          publicPath
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      bookingProducts {
+        edges {
+          node {
+            id
+            _id
+            type
+            qty
+            location
+            showLocation
+            availableFrom
+            availableTo
+            defaultSlot {
+              id
+              _id
+              bookingType
+              duration
+              breakTime
+              slots
+            }
+            appointmentSlot {
+              id
+              _id
+              bookingProductId
+              duration
+              breakTime
+              sameSlotAllDays
+              slots
+            }
+            rentalSlot {
+              id
+              _id
+              bookingProductId
+              rentingType
+              dailyPrice
+              hourlyPrice
+              sameSlotAllDays
+              slots
+            }
+            tableSlot {
+              id
+              _id
+              bookingProductId
+              priceType
+              guestLimit
+              duration
+              breakTime
+              preventSchedulingBefore
+              sameSlotAllDays
+              slots
+            }
+            eventTickets {
+              edges {
+                node {
+                  id
+                  _id
+                  bookingProductId
+                  price
+                  qty
+                  specialPrice
+                  specialPriceFrom
+                  specialPriceTo
+                }
+              }
+            }
           }
         }
       }
@@ -417,10 +1211,54 @@ class CartMutations {
     }
   ''';
 
-  /// ADD_PRODUCT_TO_CART – add a product to cart
-  /// Source: nextjs-commerce/src/graphql/cart/mutations/AddProductToCart.ts
-  static const String addProductToCart = r'''
-    mutation CreateAddProductInCart(
+  /// Shared cart fields for consistent responses
+  static const String _cartResultFields = r'''
+          id
+          cartToken
+          subtotal
+          formattedSubtotal
+          itemsCount
+          taxAmount
+          formattedTaxAmount
+          shippingAmount
+          formattedShippingAmount
+          grandTotal
+          formattedGrandTotal
+          discountAmount
+          formattedDiscountAmount
+          couponCode
+          items {
+            edges {
+              node {
+                id
+                cartId
+                productId
+                name
+                price
+                formattedPrice
+                total
+                formattedTotal
+                baseImage
+                sku
+                quantity
+                type
+                productUrlKey
+                canChangeQty
+                options
+              }
+            }
+          }
+          success
+          message
+          sessionToken
+          isGuest
+          itemsQty
+  ''';
+
+  /// ADD_SIMPLE_PRODUCT_TO_CART
+  static const String addSimpleProductToCart =
+      r'''
+    mutation AddSimpleProductToCart(
       $cartId: Int
       $productId: Int!
       $quantity: Int!
@@ -433,41 +1271,155 @@ class CartMutations {
         }
       ) {
         addProductInCart {
-          id
-          cartToken
-          subtotal
-          itemsCount
-          taxAmount
-          shippingAmount
-          grandTotal
-          discountAmount
-          couponCode
-          items {
-            edges {
-              node {
-                id
-                cartId
-                productId
-                name
-                price
-                baseImage
-                sku
-                quantity
-                type
-                productUrlKey
-                canChangeQty
-              }
-            }
-          }
-          success
-          message
-          sessionToken
-          isGuest
-          itemsQty
+''' +
+      _cartResultFields +
+      r'''
         }
       }
     }
   ''';
+
+  /// ADD_CONFIGURABLE_PRODUCT_TO_CART
+  static const String addConfigurableProductToCart =
+      r'''
+    mutation AddConfigurableProductToCart(
+      $cartId: Int
+      $productId: Int!
+      $quantity: Int!
+      $selectedConfigurableOption: Int!
+      $superAttribute: Iterable
+    ) {
+      createAddProductInCart(
+        input: {
+          cartId: $cartId
+          productId: $productId
+          quantity: $quantity
+          selectedConfigurableOption: $selectedConfigurableOption
+          superAttribute: $superAttribute
+        }
+      ) {
+        addProductInCart {
+''' +
+      _cartResultFields +
+      r'''
+        }
+      }
+    }
+  ''';
+
+  /// ADD_DOWNLOADABLE_PRODUCT_TO_CART
+  static const String addDownloadableProductToCart =
+      r'''
+    mutation AddDownloadableProductToCart(
+      $cartId: Int
+      $productId: Int!
+      $quantity: Int!
+      $links: Iterable
+    ) {
+      createAddProductInCart(
+        input: {
+          cartId: $cartId
+          productId: $productId
+          quantity: $quantity
+          links: $links
+        }
+      ) {
+        addProductInCart {
+''' +
+      _cartResultFields +
+      r'''
+        }
+      }
+    }
+  ''';
+
+  /// ADD_GROUPED_PRODUCT_TO_CART
+  /// Uses JSON-string variable `groupedQty` for grouped item quantities.
+  static const String addGroupedProductToCart =
+      r'''
+    mutation AddGroupedProductToCart(
+      $cartId: Int
+      $productId: Int!
+      $quantity: Int!
+      $groupedQty: String
+    ) {
+      createAddProductInCart(
+        input: {
+          cartId: $cartId
+          productId: $productId
+          quantity: $quantity
+          groupedQty: $groupedQty
+        }
+      ) {
+        addProductInCart {
+''' +
+      _cartResultFields +
+      r'''
+        }
+      }
+    }
+  ''';
+
+  /// ADD_BUNDLE_PRODUCT_TO_CART
+  /// Uses JSON-string variables for `bundleOptions` and `bundleOptionQty`.
+  static const String addBundleProductToCart =
+      r'''
+    mutation AddBundleProductToCart(
+      $cartId: Int
+      $productId: Int!
+      $quantity: Int!
+      $bundleOptions: String
+      $bundleOptionQty: String
+    ) {
+      createAddProductInCart(
+        input: {
+          cartId: $cartId
+          productId: $productId
+          quantity: $quantity
+          bundleOptions: $bundleOptions
+          bundleOptionQty: $bundleOptionQty
+        }
+      ) {
+        addProductInCart {
+''' +
+      _cartResultFields +
+      r'''
+        }
+      }
+    }
+  ''';
+
+  /// ADD_BOOKING_PRODUCT_TO_CART
+  /// Uses JSON-string variable `booking` and optional `specialNote`.
+  static const String addBookingProductToCart =
+      r'''
+    mutation AddBookingProductToCart(
+      $cartId: Int
+      $productId: Int!
+      $booking: String!
+      $quantity: Int
+      $specialNote: String
+    ) {
+      createAddProductInCart(
+        input: {
+          cartId: $cartId
+          productId: $productId
+          quantity: $quantity
+          booking: $booking
+          bookingNote: $specialNote
+        }
+      ) {
+        addProductInCart {
+''' +
+      _cartResultFields +
+      r'''
+        }
+      }
+    }
+  ''';
+
+  /// Old addProductToCart (kept for compatibility)
+  static const String addProductToCart = addSimpleProductToCart;
 
   /// GET_CART_ITEM – read the current cart
   /// Source: nextjs-commerce/src/graphql/cart/mutations/GetCartItem.ts
@@ -478,10 +1430,15 @@ class CartMutations {
           id
           itemsCount
           taxAmount
+          formattedTaxAmount
           grandTotal
+          formattedGrandTotal
           shippingAmount
+          formattedShippingAmount
           subtotal
+          formattedSubtotal
           discountAmount
+          formattedDiscountAmount
           couponCode
           itemsQty
           isGuest
@@ -493,12 +1450,16 @@ class CartMutations {
                 productId
                 name
                 price
+                formattedPrice
+                total
+                formattedTotal
                 baseImage
                 sku
                 quantity
                 type
                 productUrlKey
                 canChangeQty
+                options
               }
             }
           }
@@ -523,10 +1484,15 @@ class CartMutations {
         updateCartItem {
           id
           taxAmount
+          formattedTaxAmount
           shippingAmount
+          formattedShippingAmount
           subtotal
+          formattedSubtotal
           grandTotal
+          formattedGrandTotal
           discountAmount
+          formattedDiscountAmount
           couponCode
           items {
             edges {
@@ -536,6 +1502,9 @@ class CartMutations {
                 productId
                 name
                 price
+                formattedPrice
+                total
+                formattedTotal
                 baseImage
                 sku
                 quantity
@@ -566,10 +1535,15 @@ class CartMutations {
           id
           cartToken
           taxAmount
+          formattedTaxAmount
           shippingAmount
+          formattedShippingAmount
           subtotal
+          formattedSubtotal
           grandTotal
+          formattedGrandTotal
           discountAmount
+          formattedDiscountAmount
           couponCode
           items {
             totalCount
@@ -580,6 +1554,9 @@ class CartMutations {
                 productId
                 name
                 price
+                formattedPrice
+                total
+                formattedTotal
                 baseImage
                 sku
                 quantity
@@ -605,10 +1582,15 @@ class CartMutations {
           message
           couponCode
           discountAmount
+          formattedDiscountAmount
           subtotal
+          formattedSubtotal
           grandTotal
+          formattedGrandTotal
           taxAmount
+          formattedTaxAmount
           shippingAmount
+          formattedShippingAmount
           itemsQty
           items {
             edges {
@@ -618,6 +1600,9 @@ class CartMutations {
                 productId
                 name
                 price
+                formattedPrice
+                total
+                formattedTotal
                 baseImage
                 sku
                 quantity
@@ -642,10 +1627,15 @@ class CartMutations {
           message
           couponCode
           discountAmount
+          formattedDiscountAmount
           subtotal
+          formattedSubtotal
           grandTotal
+          formattedGrandTotal
           taxAmount
+          formattedTaxAmount
           shippingAmount
+          formattedShippingAmount
           itemsQty
           items {
             edges {
@@ -655,6 +1645,9 @@ class CartMutations {
                 productId
                 name
                 price
+                formattedPrice
+                total
+                formattedTotal
                 baseImage
                 sku
                 quantity
@@ -679,10 +1672,15 @@ class CartMutations {
           id
           cartToken
           taxAmount
+          formattedTaxAmount
           subtotal
+          formattedSubtotal
           shippingAmount
+          formattedShippingAmount
           grandTotal
+          formattedGrandTotal
           discountAmount
+          formattedDiscountAmount
           couponCode
           itemsQty
           itemsCount
@@ -695,6 +1693,9 @@ class CartMutations {
                 productId
                 name
                 price
+                formattedPrice
+                total
+                formattedTotal
                 baseImage
                 sku
                 quantity

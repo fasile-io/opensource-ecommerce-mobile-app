@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../bloc/order_detail_bloc.dart';
 
@@ -61,6 +62,7 @@ class _ShipmentDetailBottomSheetState extends State<ShipmentDetailBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return BlocBuilder<OrderDetailBloc, OrderDetailState>(
       buildWhen: (prev, curr) =>
@@ -103,7 +105,7 @@ class _ShipmentDetailBottomSheetState extends State<ShipmentDetailBottomSheet> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Shipment ${displayShipment.shipmentNumber}',
+                              l10n.accountShipmentNumber(displayShipment.shipmentNumber),
                               style: TextStyle(
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w500,
@@ -146,7 +148,7 @@ class _ShipmentDetailBottomSheetState extends State<ShipmentDetailBottomSheet> {
                                 MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '${displayShipment.items.length} Item(s)',
+                                l10n.accountItemsCount(displayShipment.items.length),
                                 style: TextStyle(
                                   fontFamily: 'Roboto',
                                   fontWeight: FontWeight.w500,
@@ -203,8 +205,8 @@ class _ShipmentDetailBottomSheetState extends State<ShipmentDetailBottomSheet> {
                                 borderRadius: BorderRadius.circular(54),
                               ),
                             ),
-                            child: const Text(
-                              'Track',
+                            child: Text(
+                              l10n.accountTrack,
                               style: TextStyle(
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w700,
@@ -225,13 +227,17 @@ class _ShipmentDetailBottomSheetState extends State<ShipmentDetailBottomSheet> {
   }
 
   void _onTrackPressed(OrderShipment shipment) {
+    final l10n = AppLocalizations.of(context)!;
     // Show a snackbar or launch tracking URL
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           content: Text(
-            'Tracking: ${shipment.trackNumber ?? "N/A"} via ${shipment.carrierTitle ?? "Unknown carrier"}',
+            l10n.accountTrackingVia(
+              shipment.trackNumber ?? l10n.accountNotAvailable,
+              shipment.carrierTitle ?? l10n.accountUnknownCarrier,
+            ),
           ),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 3),
@@ -255,6 +261,7 @@ class _TrackingNumberCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       width: double.infinity,
@@ -272,7 +279,7 @@ class _TrackingNumberCard extends StatelessWidget {
         children: [
           // "Tracking Number" label — Figma: Roboto Regular 14, #262626
           Text(
-            'Tracking Number',
+            l10n.accountTrackingNumber,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w400,
@@ -283,7 +290,7 @@ class _TrackingNumberCard extends StatelessWidget {
           const SizedBox(height: 6),
           // Tracking number value — Figma: Roboto Bold 16, #262626
           Text(
-            shipment.trackNumber ?? 'N/A',
+            shipment.trackNumber ?? l10n.accountNotAvailable,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w700,
@@ -313,6 +320,7 @@ class _ShipmentItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       width: double.infinity,
@@ -341,7 +349,7 @@ class _ShipmentItemCard extends StatelessWidget {
           const SizedBox(height: 6),
           // "SKU : {sku}" — Figma: Roboto Regular 14, #171717
           Text(
-            'SKU : ${item.sku ?? item.name}',
+            l10n.accountSkuValue(item.sku ?? item.name),
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w400,
@@ -352,7 +360,7 @@ class _ShipmentItemCard extends StatelessWidget {
           const SizedBox(height: 6),
           // "Shipped Qty : {qty}" — Figma: Roboto Regular 14, #171717
           Text(
-            'Shipped Qty : ${item.qty}',
+            l10n.accountShippedQtyValue(item.qty),
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w400,

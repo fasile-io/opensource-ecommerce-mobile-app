@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../exceptions/image_search_exceptions.dart';
@@ -69,6 +71,12 @@ class PermissionService {
 
   /// Check and request photo library/gallery permission
   Future<bool> requestPhotoLibraryPermission() async {
+    if (Platform.isAndroid) {
+      // Android uses the system photo picker / gallery intents for selection,
+      // so broad library permission is not required here.
+      return true;
+    }
+
     try {
       // First check current status
       final currentStatus = await Permission.photos.status;
@@ -143,6 +151,10 @@ class PermissionService {
 
   /// Check if photo library permission is granted
   Future<bool> hasPhotoLibraryPermission() async {
+    if (Platform.isAndroid) {
+      return true;
+    }
+
     try {
       final status = await Permission.photos.status;
       return status.isGranted;

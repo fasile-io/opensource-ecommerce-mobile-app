@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../category/data/models/product_model.dart';
 import '../../../category/data/models/category_model.dart';
 import '../../../category/data/repository/category_repository.dart';
@@ -96,15 +97,15 @@ class SearchState extends Equatable {
 
   @override
   List<Object?> get props => [
-        status,
-        query,
-        searchResults,
-        recentSearches,
-        topCategories,
-        errorMessage,
-        hasMore,
-        totalCount,
-      ];
+    status,
+    query,
+    searchResults,
+    recentSearches,
+    topCategories,
+    errorMessage,
+    hasMore,
+    totalCount,
+  ];
 }
 
 // ─── BLoC ──────────────────────────────────────────────────────────────────
@@ -154,7 +155,9 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   }
 
   Future<void> _onInitSearch(
-      InitSearch event, Emitter<SearchState> emit) async {
+    InitSearch event,
+    Emitter<SearchState> emit,
+  ) async {
     // Load recent searches
     final recentSearches = await _loadRecentSearches();
 
@@ -170,11 +173,13 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       // Silently ignore category fetch errors
     }
 
-    emit(state.copyWith(
-      status: SearchStatus.initial,
-      recentSearches: recentSearches,
-      topCategories: categories,
-    ));
+    emit(
+      state.copyWith(
+        status: SearchStatus.initial,
+        recentSearches: recentSearches,
+        topCategories: categories,
+      ),
+    );
   }
 
   Future<void> _onSearchQueryChanged(
@@ -184,42 +189,50 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     final query = event.query.trim();
 
     if (query.isEmpty) {
-      emit(state.copyWith(
-        status: SearchStatus.initial,
-        query: '',
-        searchResults: [],
-      ));
+      emit(
+        state.copyWith(
+          status: SearchStatus.initial,
+          query: '',
+          searchResults: [],
+        ),
+      );
       return;
     }
 
     emit(state.copyWith(status: SearchStatus.searching, query: query));
 
     try {
-      final result = await repository.getProducts(
-        query: query,
-        first: 20,
-      );
+      final result = await repository.getProducts(query: query, first: 20);
 
       if (result.products.isEmpty) {
-        emit(state.copyWith(
-          status: SearchStatus.empty,
-          searchResults: [],
-          totalCount: 0,
-          hasMore: false,
-        ));
+        emit(
+          state.copyWith(
+            status: SearchStatus.empty,
+            searchResults: [],
+            totalCount: 0,
+            hasMore: false,
+          ),
+        );
       } else {
-        emit(state.copyWith(
-          status: SearchStatus.results,
-          searchResults: result.products,
-          totalCount: result.totalCount,
-          hasMore: result.pageInfo.hasNextPage,
-        ));
+        emit(
+          state.copyWith(
+            status: SearchStatus.results,
+            searchResults: result.products,
+            totalCount: result.totalCount,
+            hasMore: result.pageInfo.hasNextPage,
+          ),
+        );
       }
     } catch (e) {
-      emit(state.copyWith(
-        status: SearchStatus.error,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          status: SearchStatus.error,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'searching for products',
+          ),
+        ),
+      );
     }
   }
 
@@ -236,47 +249,57 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     // Update recent searches in state
     final recentSearches = await _loadRecentSearches();
 
-    emit(state.copyWith(
-      status: SearchStatus.searching,
-      query: query,
-      recentSearches: recentSearches,
-    ));
+    emit(
+      state.copyWith(
+        status: SearchStatus.searching,
+        query: query,
+        recentSearches: recentSearches,
+      ),
+    );
 
     try {
-      final result = await repository.getProducts(
-        query: query,
-        first: 20,
-      );
+      final result = await repository.getProducts(query: query, first: 20);
 
       if (result.products.isEmpty) {
-        emit(state.copyWith(
-          status: SearchStatus.empty,
-          searchResults: [],
-          totalCount: 0,
-          hasMore: false,
-        ));
+        emit(
+          state.copyWith(
+            status: SearchStatus.empty,
+            searchResults: [],
+            totalCount: 0,
+            hasMore: false,
+          ),
+        );
       } else {
-        emit(state.copyWith(
-          status: SearchStatus.results,
-          searchResults: result.products,
-          totalCount: result.totalCount,
-          hasMore: result.pageInfo.hasNextPage,
-        ));
+        emit(
+          state.copyWith(
+            status: SearchStatus.results,
+            searchResults: result.products,
+            totalCount: result.totalCount,
+            hasMore: result.pageInfo.hasNextPage,
+          ),
+        );
       }
     } catch (e) {
-      emit(state.copyWith(
-        status: SearchStatus.error,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          status: SearchStatus.error,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'searching for products',
+          ),
+        ),
+      );
     }
   }
 
   void _onClearSearch(ClearSearch event, Emitter<SearchState> emit) {
-    emit(state.copyWith(
-      status: SearchStatus.initial,
-      query: '',
-      searchResults: [],
-    ));
+    emit(
+      state.copyWith(
+        status: SearchStatus.initial,
+        query: '',
+        searchResults: [],
+      ),
+    );
   }
 
   Future<void> _onRemoveRecentSearch(

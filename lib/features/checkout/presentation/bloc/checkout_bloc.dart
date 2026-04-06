@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../cart/data/models/cart_model.dart';
 import '../../data/models/checkout_model.dart';
 import '../../data/repository/checkout_repository.dart';
@@ -139,6 +140,9 @@ class CheckoutState extends Equatable {
   final List<PaymentMethod> paymentMethods;
   final String? selectedPaymentMethod;
 
+  /// Whether the cart contains only virtual products
+  final bool isVirtualOnly;
+
   final String? couponCode;
   final String? errorMessage;
   final String? successMessage;
@@ -166,6 +170,7 @@ class CheckoutState extends Equatable {
     this.selectedShippingMethod,
     this.paymentMethods = const [],
     this.selectedPaymentMethod,
+    this.isVirtualOnly = false,
     this.couponCode,
     this.errorMessage,
     this.successMessage,
@@ -182,7 +187,7 @@ class CheckoutState extends Equatable {
   /// Whether all required steps are complete for placing an order.
   bool get canPlaceOrder =>
       addressConfirmed &&
-      selectedShippingMethod != null &&
+      (isVirtualOnly || selectedShippingMethod != null) &&
       selectedPaymentMethod != null &&
       !isPlacingOrder;
 
@@ -199,6 +204,7 @@ class CheckoutState extends Equatable {
     String? selectedShippingMethod,
     List<PaymentMethod>? paymentMethods,
     String? selectedPaymentMethod,
+    bool? isVirtualOnly,
     String? couponCode,
     String? errorMessage,
     String? successMessage,
@@ -250,6 +256,7 @@ class CheckoutState extends Equatable {
       billingStatesLoading: billingStatesLoading ?? this.billingStatesLoading,
       shippingStatesLoading:
           shippingStatesLoading ?? this.shippingStatesLoading,
+      isVirtualOnly: isVirtualOnly ?? this.isVirtualOnly,
     );
   }
 
@@ -278,6 +285,7 @@ class CheckoutState extends Equatable {
     shippingStates,
     billingStatesLoading,
     shippingStatesLoading,
+    isVirtualOnly,
   ];
 }
 
@@ -329,6 +337,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         cart: event.cart,
         cartToken: token,
         isGuest: event.isGuest,
+        isVirtualOnly: event.cart.isVirtualOnly,
         isLoading: true,
         status: CheckoutStatus.loading,
       ),
@@ -387,10 +396,14 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       if (defaultAddr != null) {
         if (hasCartAddress) {
           // Cart already has address saved — just mark confirmed and fetch shipping/payment
-          debugPrint('[CheckoutBloc] Cart already has address — auto-proceeding');
+          debugPrint(
+            '[CheckoutBloc] Cart already has address — auto-proceeding',
+          );
           emit(
             state.copyWith(
-              addresses: customerAddresses.isNotEmpty ? customerAddresses : addresses,
+              addresses: customerAddresses.isNotEmpty
+                  ? customerAddresses
+                  : addresses,
               selectedAddress: defaultAddr,
               status: CheckoutStatus.addressSaved,
               addressConfirmed: true,
@@ -399,80 +412,46 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
           );
           add(FetchCountries());
 
-          try {
-            final rates = await repository.getShippingRates();
-            debugPrint('[CheckoutBloc] Auto-fetched ${rates.length} shipping rates');
-
-            if (rates.isNotEmpty) {
-              final firstRate = rates.first;
-              final shipResp = await repository.saveShippingMethod(firstRate.method);
-              debugPrint('[CheckoutBloc] Auto-saved shipping: ${firstRate.code}, success=${shipResp.success}');
-
-              if (shipResp.success) {
-                final methods = await repository.getPaymentMethods();
-                debugPrint('[CheckoutBloc] Auto-fetched ${methods.length} payment methods');
-                emit(
-                  state.copyWith(
-                    shippingRates: rates,
-                    selectedShippingMethod: firstRate.code,
-                    status: CheckoutStatus.paymentMethodsFetched,
-                    paymentMethods: methods,
-                  ),
-                );
-              } else {
-                emit(state.copyWith(shippingRates: rates, status: CheckoutStatus.shippingRatesFetched));
-              }
-            } else {
-              emit(state.copyWith(shippingRates: rates, status: CheckoutStatus.shippingRatesFetched));
-            }
-          } catch (e) {
-            debugPrint('[CheckoutBloc] Auto-fetch shipping rates error: $e');
-          }
-          return;
-        }
-
-        // No cart address yet — save the default/selected address
-        debugPrint('[CheckoutBloc] Auto-saving default checkout address: ${defaultAddr.fullName}');
-        try {
-          final saveInput = defaultAddr.toBillingInput(useForShipping: true);
-          final saveResponse = await repository.saveCheckoutAddress(saveInput);
-          debugPrint('[CheckoutBloc] Auto-saved checkout address — success=${saveResponse.success}, cartToken=${saveResponse.cartToken}');
-
-          if (saveResponse.success) {
-            // Update cart query token
-            final rawCartToken = saveResponse.cartToken;
-            final queryToken = (rawCartToken != null && rawCartToken.isNotEmpty)
-                ? rawCartToken
-                : (saveResponse.id != null && saveResponse.id!.isNotEmpty)
-                ? saveResponse.id!
-                : '';
-            repository.updateCartQueryToken(queryToken);
-
-            emit(
-              state.copyWith(
-                addresses: customerAddresses.isNotEmpty ? customerAddresses : addresses,
-                selectedAddress: defaultAddr,
-                status: CheckoutStatus.addressSaved,
-                addressConfirmed: true,
-                cartToken: queryToken,
-                isLoading: false,
-              ),
+          // Now fetch shipping rates (skip if virtual only and fetch payment methods directly)
+          if (state.isVirtualOnly) {
+            debugPrint(
+              '[CheckoutBloc] Virtual only — skipping shipping rates, fetching payment methods',
             );
-            add(FetchCountries());
-
-            // Fetch shipping rates, auto-select first, then payment methods
             try {
-              final rates = await repository.getShippingRates(queryToken: queryToken);
-              debugPrint('[CheckoutBloc] Auto-fetched ${rates.length} shipping rates');
+              final methods = await repository.getPaymentMethods();
+              debugPrint(
+                '[CheckoutBloc] Auto-fetched ${methods.length} payment methods (virtual only)',
+              );
+              emit(
+                state.copyWith(
+                  status: CheckoutStatus.paymentMethodsFetched,
+                  paymentMethods: methods,
+                ),
+              );
+            } catch (e) {
+              debugPrint('[CheckoutBloc] Auto-fetch payment methods error: $e');
+            }
+          } else {
+            try {
+              final rates = await repository.getShippingRates();
+              debugPrint(
+                '[CheckoutBloc] Auto-fetched ${rates.length} shipping rates',
+              );
 
               if (rates.isNotEmpty) {
                 final firstRate = rates.first;
-                final shipResp = await repository.saveShippingMethod(firstRate.method);
-                debugPrint('[CheckoutBloc] Auto-saved shipping method: ${firstRate.code}, success=${shipResp.success}');
+                final shipResp = await repository.saveShippingMethod(
+                  firstRate.method,
+                );
+                debugPrint(
+                  '[CheckoutBloc] Auto-saved shipping: ${firstRate.code}, success=${shipResp.success}',
+                );
 
                 if (shipResp.success) {
                   final methods = await repository.getPaymentMethods();
-                  debugPrint('[CheckoutBloc] Auto-fetched ${methods.length} payment methods');
+                  debugPrint(
+                    '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
+                  );
                   emit(
                     state.copyWith(
                       shippingRates: rates,
@@ -490,72 +469,99 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
                   );
                 }
               } else {
-                emit(state.copyWith(shippingRates: rates, status: CheckoutStatus.shippingRatesFetched));
+                emit(
+                  state.copyWith(
+                    shippingRates: rates,
+                    status: CheckoutStatus.shippingRatesFetched,
+                  ),
+                );
               }
             } catch (e) {
               debugPrint('[CheckoutBloc] Auto-fetch shipping rates error: $e');
             }
-            return;
           }
-        } catch (e) {
-          debugPrint('[CheckoutBloc] Auto-save checkout address error: $e — falling through to manual');
+          return;
         }
-      }
 
-      // ── Fallback: if no checkout addresses, fetch from account/customer addresses ──
-      if (customerAddresses.isEmpty && !hasCartAddress) {
-        debugPrint('[CheckoutBloc] No checkout addresses found — fetching customer addresses as fallback');
+        // No cart address yet — save the default/selected address
+        debugPrint(
+          '[CheckoutBloc] Auto-saving default checkout address: ${defaultAddr.fullName}',
+        );
         try {
-          final accountAddresses = await repository.getCustomerAddresses();
-          debugPrint('[CheckoutBloc] fetched ${accountAddresses.length} customer addresses');
+          final saveInput = defaultAddr.toBillingInput(useForShipping: true);
+          final saveResponse = await repository.saveCheckoutAddress(saveInput);
+          debugPrint(
+            '[CheckoutBloc] Auto-saved checkout address — success=${saveResponse.success}, cartToken=${saveResponse.cartToken}',
+          );
 
-          if (accountAddresses.isNotEmpty) {
-            // Find the default address, or use the first one
-            final fallbackAddr = accountAddresses.firstWhere(
-              (a) => a.defaultAddress,
-              orElse: () => accountAddresses.first,
+          if (saveResponse.success) {
+            // Update cart query token
+            final rawCartToken = saveResponse.cartToken;
+            final queryToken = (rawCartToken != null && rawCartToken.isNotEmpty)
+                ? rawCartToken
+                : (saveResponse.id != null && saveResponse.id!.isNotEmpty)
+                ? saveResponse.id!
+                : '';
+            repository.updateCartQueryToken(queryToken);
+
+            emit(
+              state.copyWith(
+                addresses: customerAddresses.isNotEmpty
+                    ? customerAddresses
+                    : addresses,
+                selectedAddress: defaultAddr,
+                status: CheckoutStatus.addressSaved,
+                addressConfirmed: true,
+                cartToken: queryToken,
+                isLoading: false,
+              ),
             );
+            add(FetchCountries());
 
-            debugPrint('[CheckoutBloc] Using customer address as default: ${fallbackAddr.fullName}');
-
-            // Auto-save this address as the checkout billing address
-            try {
-              final saveInput = fallbackAddr.toBillingInput(useForShipping: true);
-              debugPrint('[CheckoutBloc] Auto-saving customer default address to checkout: $saveInput');
-              final saveResponse = await repository.saveCheckoutAddress(saveInput);
-              debugPrint('[CheckoutBloc] Auto-saved address — success=${saveResponse.success}, cartToken=${saveResponse.cartToken}');
-
-              // Update cart query token if returned
-              if (saveResponse.cartToken != null && saveResponse.cartToken!.isNotEmpty) {
-                repository.updateCartQueryToken(saveResponse.cartToken);
-              }
-              final fallbackQueryToken = saveResponse.cartToken ?? '';
-
-              emit(
-                state.copyWith(
-                  addresses: accountAddresses,
-                  selectedAddress: fallbackAddr,
-                  status: CheckoutStatus.addressSaved,
-                  addressConfirmed: true,
-                  cartToken: fallbackQueryToken,
-                  isLoading: false,
-                ),
+            // Fetch shipping rates (or payment methods if virtual only)
+            if (state.isVirtualOnly) {
+              debugPrint(
+                '[CheckoutBloc] Virtual only — skipping shipping rates, fetching payment methods',
               );
-
-              // Now fetch shipping rates since address is saved
-              add(FetchCountries());
               try {
-                final rates = await repository.getShippingRates(queryToken: fallbackQueryToken);
-                debugPrint('[CheckoutBloc] Auto-fetched ${rates.length} shipping rates');
+                final methods = await repository.getPaymentMethods();
+                debugPrint(
+                  '[CheckoutBloc] Auto-fetched ${methods.length} payment methods (virtual only)',
+                );
+                emit(
+                  state.copyWith(
+                    status: CheckoutStatus.paymentMethodsFetched,
+                    paymentMethods: methods,
+                  ),
+                );
+              } catch (e) {
+                debugPrint(
+                  '[CheckoutBloc] Auto-fetch payment methods error: $e',
+                );
+              }
+            } else {
+              try {
+                final rates = await repository.getShippingRates(
+                  queryToken: queryToken,
+                );
+                debugPrint(
+                  '[CheckoutBloc] Auto-fetched ${rates.length} shipping rates',
+                );
 
                 if (rates.isNotEmpty) {
                   final firstRate = rates.first;
-                  final shipResp = await repository.saveShippingMethod(firstRate.method);
-                  debugPrint('[CheckoutBloc] Auto-saved shipping: ${firstRate.code}, success=${shipResp.success}');
+                  final shipResp = await repository.saveShippingMethod(
+                    firstRate.method,
+                  );
+                  debugPrint(
+                    '[CheckoutBloc] Auto-saved shipping method: ${firstRate.code}, success=${shipResp.success}',
+                  );
 
                   if (shipResp.success) {
                     final methods = await repository.getPaymentMethods();
-                    debugPrint('[CheckoutBloc] Auto-fetched ${methods.length} payment methods');
+                    debugPrint(
+                      '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
+                    );
                     emit(
                       state.copyWith(
                         shippingRates: rates,
@@ -573,10 +579,156 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
                     );
                   }
                 } else {
-                  emit(state.copyWith(shippingRates: rates, status: CheckoutStatus.shippingRatesFetched));
+                  emit(
+                    state.copyWith(
+                      shippingRates: rates,
+                      status: CheckoutStatus.shippingRatesFetched,
+                    ),
+                  );
                 }
               } catch (e) {
-                debugPrint('[CheckoutBloc] Auto-fetch shipping rates error: $e');
+                debugPrint(
+                  '[CheckoutBloc] Auto-fetch shipping rates error: $e',
+                );
+              }
+            }
+            return;
+          }
+        } catch (e) {
+          debugPrint(
+            '[CheckoutBloc] Auto-save checkout address error: $e — falling through to manual',
+          );
+        }
+      }
+
+      // ── Fallback: if no checkout addresses, fetch from account/customer addresses ──
+      if (customerAddresses.isEmpty && !hasCartAddress) {
+        debugPrint(
+          '[CheckoutBloc] No checkout addresses found — fetching customer addresses as fallback',
+        );
+        try {
+          final accountAddresses = await repository.getCustomerAddresses();
+          debugPrint(
+            '[CheckoutBloc] fetched ${accountAddresses.length} customer addresses',
+          );
+
+          if (accountAddresses.isNotEmpty) {
+            // Find the default address, or use the first one
+            final fallbackAddr = accountAddresses.firstWhere(
+              (a) => a.defaultAddress,
+              orElse: () => accountAddresses.first,
+            );
+
+            debugPrint(
+              '[CheckoutBloc] Using customer address as default: ${fallbackAddr.fullName}',
+            );
+
+            // Auto-save this address as the checkout billing address
+            try {
+              final saveInput = fallbackAddr.toBillingInput(
+                useForShipping: true,
+              );
+              debugPrint(
+                '[CheckoutBloc] Auto-saving customer default address to checkout: $saveInput',
+              );
+              final saveResponse = await repository.saveCheckoutAddress(
+                saveInput,
+              );
+              debugPrint(
+                '[CheckoutBloc] Auto-saved address — success=${saveResponse.success}, cartToken=${saveResponse.cartToken}',
+              );
+
+              // Update cart query token if returned
+              if (saveResponse.cartToken != null &&
+                  saveResponse.cartToken!.isNotEmpty) {
+                repository.updateCartQueryToken(saveResponse.cartToken);
+              }
+              final fallbackQueryToken = saveResponse.cartToken ?? '';
+
+              emit(
+                state.copyWith(
+                  addresses: accountAddresses,
+                  selectedAddress: fallbackAddr,
+                  status: CheckoutStatus.addressSaved,
+                  addressConfirmed: true,
+                  cartToken: fallbackQueryToken,
+                  isLoading: false,
+                ),
+              );
+
+              // Fetch shipping rates (or payment methods if virtual only)
+              if (state.isVirtualOnly) {
+                debugPrint(
+                  '[CheckoutBloc] Virtual only — skipping shipping rates, fetching payment methods',
+                );
+                try {
+                  final methods = await repository.getPaymentMethods();
+                  debugPrint(
+                    '[CheckoutBloc] Auto-fetched ${methods.length} payment methods (virtual only)',
+                  );
+                  emit(
+                    state.copyWith(
+                      status: CheckoutStatus.paymentMethodsFetched,
+                      paymentMethods: methods,
+                    ),
+                  );
+                } catch (e) {
+                  debugPrint(
+                    '[CheckoutBloc] Auto-fetch payment methods error: $e',
+                  );
+                }
+              } else {
+                try {
+                  final rates = await repository.getShippingRates(
+                    queryToken: fallbackQueryToken,
+                  );
+                  debugPrint(
+                    '[CheckoutBloc] Auto-fetched ${rates.length} shipping rates',
+                  );
+
+                  if (rates.isNotEmpty) {
+                    final firstRate = rates.first;
+                    final shipResp = await repository.saveShippingMethod(
+                      firstRate.method,
+                    );
+                    debugPrint(
+                      '[CheckoutBloc] Auto-saved shipping: ${firstRate.code}, success=${shipResp.success}',
+                    );
+
+                    if (shipResp.success) {
+                      final methods = await repository.getPaymentMethods();
+                      debugPrint(
+                        '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
+                      );
+                      emit(
+                        state.copyWith(
+                          shippingRates: rates,
+                          selectedShippingMethod: firstRate.code,
+                          status: CheckoutStatus.paymentMethodsFetched,
+                          paymentMethods: methods,
+                        ),
+                      );
+                    } else {
+                      emit(
+                        state.copyWith(
+                          shippingRates: rates,
+                          status: CheckoutStatus.shippingRatesFetched,
+                        ),
+                      );
+                    }
+                  } else {
+                    emit(
+                      state.copyWith(
+                        shippingRates: rates,
+                        status: CheckoutStatus.shippingRatesFetched,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint(
+                    '[CheckoutBloc] Auto-fetch shipping rates error: $e',
+                  );
+                }
               }
               return;
             } catch (e) {
@@ -648,9 +800,13 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
     // Auto-save the newly selected address
     try {
       final saveInput = event.address.toBillingInput(useForShipping: true);
-      debugPrint('[CheckoutBloc] Auto-saving selected address: ${event.address.fullName}');
+      debugPrint(
+        '[CheckoutBloc] Auto-saving selected address: ${event.address.fullName}',
+      );
       final saveResponse = await repository.saveCheckoutAddress(saveInput);
-      debugPrint('[CheckoutBloc] Auto-saved address — success=${saveResponse.success}, cartToken=${saveResponse.cartToken}');
+      debugPrint(
+        '[CheckoutBloc] Auto-saved address — success=${saveResponse.success}, cartToken=${saveResponse.cartToken}',
+      );
 
       if (!saveResponse.success) {
         emit(
@@ -678,28 +834,73 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         ),
       );
 
-      // Fetch shipping rates, auto-select first, then payment methods
-      try {
-        final rates = await repository.getShippingRates(queryToken: queryToken);
-        debugPrint('[CheckoutBloc] Auto-fetched ${rates.length} shipping rates after address change');
+      // Fetch shipping rates (or payment methods if virtual only)
+      if (state.isVirtualOnly) {
+        debugPrint(
+          '[CheckoutBloc] Virtual only — skipping shipping rates, fetching payment methods',
+        );
+        try {
+          final methods = await repository.getPaymentMethods();
+          debugPrint(
+            '[CheckoutBloc] Auto-fetched ${methods.length} payment methods (virtual only)',
+          );
+          emit(
+            state.copyWith(
+              status: CheckoutStatus.paymentMethodsFetched,
+              paymentMethods: methods,
+              isLoading: false,
+            ),
+          );
+        } catch (e) {
+          debugPrint('[CheckoutBloc] Auto-fetch payment methods error: $e');
+          emit(
+            state.copyWith(
+              isLoading: false,
+              errorMessage: 'Address saved but failed to load payment methods',
+            ),
+          );
+        }
+      } else {
+        try {
+          final rates = await repository.getShippingRates(
+            queryToken: queryToken,
+          );
+          debugPrint(
+            '[CheckoutBloc] Auto-fetched ${rates.length} shipping rates after address change',
+          );
 
-        if (rates.isNotEmpty) {
-          final firstRate = rates.first;
-          final shipResp = await repository.saveShippingMethod(firstRate.method);
-          debugPrint('[CheckoutBloc] Auto-saved shipping: ${firstRate.code}, success=${shipResp.success}');
-
-          if (shipResp.success) {
-            final methods = await repository.getPaymentMethods();
-            debugPrint('[CheckoutBloc] Auto-fetched ${methods.length} payment methods');
-            emit(
-              state.copyWith(
-                shippingRates: rates,
-                selectedShippingMethod: firstRate.code,
-                status: CheckoutStatus.paymentMethodsFetched,
-                paymentMethods: methods,
-                isLoading: false,
-              ),
+          if (rates.isNotEmpty) {
+            final firstRate = rates.first;
+            final shipResp = await repository.saveShippingMethod(
+              firstRate.method,
             );
+            debugPrint(
+              '[CheckoutBloc] Auto-saved shipping: ${firstRate.code}, success=${shipResp.success}',
+            );
+
+            if (shipResp.success) {
+              final methods = await repository.getPaymentMethods();
+              debugPrint(
+                '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
+              );
+              emit(
+                state.copyWith(
+                  shippingRates: rates,
+                  selectedShippingMethod: firstRate.code,
+                  status: CheckoutStatus.paymentMethodsFetched,
+                  paymentMethods: methods,
+                  isLoading: false,
+                ),
+              );
+            } else {
+              emit(
+                state.copyWith(
+                  shippingRates: rates,
+                  status: CheckoutStatus.shippingRatesFetched,
+                  isLoading: false,
+                ),
+              );
+            }
           } else {
             emit(
               state.copyWith(
@@ -709,19 +910,25 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
               ),
             );
           }
-        } else {
-          emit(state.copyWith(shippingRates: rates, status: CheckoutStatus.shippingRatesFetched, isLoading: false));
+        } catch (e) {
+          debugPrint('[CheckoutBloc] Auto-fetch shipping rates error: $e');
+          emit(
+            state.copyWith(
+              isLoading: false,
+              errorMessage: 'Address saved but failed to load shipping rates',
+            ),
+          );
         }
-      } catch (e) {
-        debugPrint('[CheckoutBloc] Auto-fetch shipping rates error: $e');
-        emit(state.copyWith(isLoading: false, errorMessage: 'Address saved but failed to load shipping rates'));
       }
     } catch (e) {
       debugPrint('[CheckoutBloc] Auto-save address on selection error: $e');
       emit(
         state.copyWith(
           isLoading: false,
-          errorMessage: 'Failed to save address: $e',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'saving your address',
+          ),
         ),
       );
     }
@@ -780,36 +987,85 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         ),
       );
 
-      // Now fetch shipping rates
-      try {
-        final rates = await repository.getShippingRates(queryToken: queryToken);
-        debugPrint('[CheckoutBloc] fetched ${rates.length} shipping rates');
-
-        // Auto-select first shipping method if available
-        if (rates.isNotEmpty) {
-          final firstRate = rates.first;
-          debugPrint('[CheckoutBloc] auto-selecting first shipping method: ${firstRate.code}');
-
-          // Save the first shipping method
-          final shipResp = await repository.saveShippingMethod(firstRate.method);
-          debugPrint('[CheckoutBloc] saveShipping success=${shipResp.success}');
-
-          if (shipResp.success) {
-            // Fetch payment methods
-            final methods = await repository.getPaymentMethods();
-            debugPrint('[CheckoutBloc] fetched ${methods.length} payment methods');
-
-            emit(
-              state.copyWith(
-                shippingRates: rates,
-                selectedShippingMethod: firstRate.code,
-                status: CheckoutStatus.paymentMethodsFetched,
-                paymentMethods: methods,
-                isLoading: false,
+      // Now fetch shipping rates (or payment methods if virtual only)
+      if (state.isVirtualOnly) {
+        debugPrint(
+          '[CheckoutBloc] Virtual only — skipping shipping rates, fetching payment methods',
+        );
+        try {
+          final methods = await repository.getPaymentMethods();
+          debugPrint(
+            '[CheckoutBloc] fetched ${methods.length} payment methods (virtual only)',
+          );
+          emit(
+            state.copyWith(
+              status: CheckoutStatus.paymentMethodsFetched,
+              paymentMethods: methods,
+              isLoading: false,
+            ),
+          );
+        } catch (e) {
+          debugPrint('[CheckoutBloc] getPaymentMethods error: $e');
+          emit(
+            state.copyWith(
+              isLoading: false,
+              errorMessage: ErrorMapper.getUserMessage(
+                e,
+                context: 'loading payment methods',
               ),
+            ),
+          );
+        }
+      } else {
+        try {
+          final rates = await repository.getShippingRates(
+            queryToken: queryToken,
+          );
+          debugPrint('[CheckoutBloc] fetched ${rates.length} shipping rates');
+
+          // Auto-select first shipping method if available
+          if (rates.isNotEmpty) {
+            final firstRate = rates.first;
+            debugPrint(
+              '[CheckoutBloc] auto-selecting first shipping method: ${firstRate.code}',
             );
+
+            // Save the first shipping method
+            final shipResp = await repository.saveShippingMethod(
+              firstRate.method,
+            );
+            debugPrint(
+              '[CheckoutBloc] saveShipping success=${shipResp.success}',
+            );
+
+            if (shipResp.success) {
+              // Fetch payment methods
+              final methods = await repository.getPaymentMethods();
+              debugPrint(
+                '[CheckoutBloc] fetched ${methods.length} payment methods',
+              );
+
+              emit(
+                state.copyWith(
+                  shippingRates: rates,
+                  selectedShippingMethod: firstRate.code,
+                  status: CheckoutStatus.paymentMethodsFetched,
+                  paymentMethods: methods,
+                  isLoading: false,
+                ),
+              );
+            } else {
+              // Shipping method save failed, but we have rates
+              emit(
+                state.copyWith(
+                  shippingRates: rates,
+                  status: CheckoutStatus.shippingRatesFetched,
+                  isLoading: false,
+                ),
+              );
+            }
           } else {
-            // Shipping method save failed, but we have rates
+            // No shipping rates available
             emit(
               state.copyWith(
                 shippingRates: rates,
@@ -818,31 +1074,28 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
               ),
             );
           }
-        } else {
-          // No shipping rates available
+        } catch (e) {
+          debugPrint('[CheckoutBloc] getShippingRates error: $e');
           emit(
             state.copyWith(
-              shippingRates: rates,
-              status: CheckoutStatus.shippingRatesFetched,
               isLoading: false,
+              errorMessage: ErrorMapper.getUserMessage(
+                e,
+                context: 'loading shipping rates',
+              ),
             ),
           );
         }
-      } catch (e) {
-        debugPrint('[CheckoutBloc] getShippingRates error: $e');
-        emit(
-          state.copyWith(
-            isLoading: false,
-            errorMessage: 'Address saved but failed to load shipping rates: $e',
-          ),
-        );
       }
     } catch (e) {
       debugPrint('[CheckoutBloc] saveCheckoutAddress error: $e');
       emit(
         state.copyWith(
           isLoading: false,
-          errorMessage: 'Failed to save address: $e',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'saving your address',
+          ),
         ),
       );
     }
@@ -899,8 +1152,10 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         emit(
           state.copyWith(
             isLoading: false,
-            errorMessage:
-                'Shipping saved but failed to load payment methods: $e',
+            errorMessage: ErrorMapper.getUserMessage(
+              e,
+              context: 'loading payment methods',
+            ),
           ),
         );
       }
@@ -909,7 +1164,10 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       emit(
         state.copyWith(
           isLoading: false,
-          errorMessage: 'Failed to save shipping method: $e',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'saving your shipping method',
+          ),
         ),
       );
     }
@@ -934,7 +1192,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       emit(state.copyWith(errorMessage: 'Please save your address first'));
       return;
     }
-    if (state.selectedShippingMethod == null) {
+    if (!state.isVirtualOnly && state.selectedShippingMethod == null) {
       emit(state.copyWith(errorMessage: 'Please select a shipping method'));
       return;
     }
@@ -989,7 +1247,10 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       emit(
         state.copyWith(
           isPlacingOrder: false,
-          errorMessage: 'Failed to place order: $e',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'placing your order',
+          ),
         ),
       );
     }
@@ -1023,7 +1284,10 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       emit(
         state.copyWith(
           isLoading: false,
-          errorMessage: 'Failed to apply coupon: $e',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'applying the coupon',
+          ),
         ),
       );
     }
@@ -1057,7 +1321,10 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
       emit(
         state.copyWith(
           isLoading: false,
-          errorMessage: 'Failed to remove coupon: $e',
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'removing the coupon',
+          ),
         ),
       );
     }
@@ -1121,25 +1388,22 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
     FetchCountryStates event,
     Emitter<CheckoutState> emit,
   ) async {
-    debugPrint('[CheckoutBloc] FetchCountryStates: countryId=${event.countryId}, countryCode=${event.countryCode}, formType=${event.formType}');
+    debugPrint(
+      '[CheckoutBloc] FetchCountryStates: countryId=${event.countryId}, countryCode=${event.countryCode}, formType=${event.formType}',
+    );
     if (event.formType == 'shipping') {
       emit(
-        state.copyWith(
-          shippingStatesLoading: true,
-          shippingStates: const [],
-        ),
+        state.copyWith(shippingStatesLoading: true, shippingStates: const []),
       );
     } else {
-      emit(
-        state.copyWith(
-          billingStatesLoading: true,
-          billingStates: const [],
-        ),
-      );
+      emit(state.copyWith(billingStatesLoading: true, billingStates: const []));
     }
 
     try {
-      final states = await repository.getCountryStates(event.countryId, countryCode: event.countryCode);
+      final states = await repository.getCountryStates(
+        event.countryId,
+        countryCode: event.countryCode,
+      );
       debugPrint(
         '[CheckoutBloc] fetched ${states.length} states for countryId=${event.countryId}',
       );
@@ -1148,17 +1412,11 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
 
       if (event.formType == 'shipping') {
         emit(
-          state.copyWith(
-            shippingStates: states,
-            shippingStatesLoading: false,
-          ),
+          state.copyWith(shippingStates: states, shippingStatesLoading: false),
         );
       } else {
         emit(
-          state.copyWith(
-            billingStates: states,
-            billingStatesLoading: false,
-          ),
+          state.copyWith(billingStates: states, billingStatesLoading: false),
         );
       }
     } catch (e) {
@@ -1173,10 +1431,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         );
       } else {
         emit(
-          state.copyWith(
-            billingStates: const [],
-            billingStatesLoading: false,
-          ),
+          state.copyWith(billingStates: const [], billingStatesLoading: false),
         );
       }
     }

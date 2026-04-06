@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/graphql/graphql_client.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../cart/presentation/bloc/cart_bloc.dart';
 import '../../../account/data/repository/account_repository.dart';
 import '../../../account/presentation/pages/order_detail_page.dart';
@@ -50,7 +51,7 @@ class ThankyouPage extends StatelessWidget {
 
                       // ── Title ──
                       Text(
-                        'Thank you for your order!',
+                        AppLocalizations.of(context)!.thankYouTitle,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w600,
@@ -67,7 +68,7 @@ class ThankyouPage extends StatelessWidget {
 
                       // ── Subtitle ──
                       Text(
-                        'We will email you, your order details\nand tracking information',
+                        AppLocalizations.of(context)!.thankYouSubtitle,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w700,
@@ -85,7 +86,9 @@ class ThankyouPage extends StatelessWidget {
                       // ── Order Number ──
                       if (orderIncrementId != null || orderId != null)
                         Text(
-                          'Your order No. #${orderIncrementId ?? orderId}',
+                          AppLocalizations.of(context)!.thankYouOrderNumber(
+                            orderIncrementId ?? orderId ?? '',
+                          ),
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w400,
@@ -118,9 +121,9 @@ class ThankyouPage extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(54),
                               ),
                             ),
-                            child: const Text(
-                              'View Order',
-                              style: TextStyle(
+                            child: Text(
+                              AppLocalizations.of(context)!.thankYouViewOrder,
+                              style: const TextStyle(
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w600,
                                 fontSize: 16,
@@ -136,7 +139,7 @@ class ThankyouPage extends StatelessWidget {
                       GestureDetector(
                         onTap: () => _onContinueShopping(context),
                         child: Text(
-                          'Continue Shopping',
+                          AppLocalizations.of(context)!.thankYouContinueShopping,
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w600,

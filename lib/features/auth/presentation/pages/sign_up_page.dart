@@ -3,8 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../bloc/auth_bloc.dart';
-import '../widgets/social_login_icons.dart';
 import 'login_page.dart';
 
 /// Sign Up page for new customers
@@ -62,6 +62,7 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -75,8 +76,8 @@ class _SignUpPageState extends State<SignUpPage> {
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Account created successfully!'),
+              SnackBar(
+                content: Text(l10n.authAccountCreatedSuccess),
                 backgroundColor: Color(0xFF00A63E),
               ),
             );
@@ -117,7 +118,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
                   // ── Heading ──
                   Text(
-                    'Create Account',
+                    l10n.authCreateAccount,
                     style: AppTextStyles.text2(context),
                     textAlign: TextAlign.center,
                   ),
@@ -125,7 +126,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   const SizedBox(height: 8),
 
                   Text(
-                    'Sign up to get started',
+                    l10n.authSignupGetStarted,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
@@ -146,12 +147,12 @@ class _SignUpPageState extends State<SignUpPage> {
                       Expanded(
                         child: _buildTextField(
                           controller: _firstNameController,
-                          label: 'First Name',
-                          hintText: 'First name',
+                          label: l10n.checkoutFirstName,
+                          hintText: l10n.authFirstNameHint,
                           isDark: isDark,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Required';
+                              return l10n.authRequired;
                             }
                             return null;
                           },
@@ -161,12 +162,12 @@ class _SignUpPageState extends State<SignUpPage> {
                       Expanded(
                         child: _buildTextField(
                           controller: _lastNameController,
-                          label: 'Last Name',
-                          hintText: 'Last name',
+                          label: l10n.checkoutLastName,
+                          hintText: l10n.authLastNameHint,
                           isDark: isDark,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Required';
+                              return l10n.authRequired;
                             }
                             return null;
                           },
@@ -180,18 +181,18 @@ class _SignUpPageState extends State<SignUpPage> {
                   // ── Email Field ──
                   _buildTextField(
                     controller: _emailController,
-                    label: 'Email Address',
-                    hintText: 'Enter your email',
+                    label: l10n.authEmailAddress,
+                    hintText: l10n.authEnterYourEmail,
                     keyboardType: TextInputType.emailAddress,
                     isDark: isDark,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return l10n.authPleaseEnterEmail;
                       }
                       if (!RegExp(
                         r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
                       ).hasMatch(value)) {
-                        return 'Please enter a valid email';
+                        return l10n.authPleaseEnterValidEmail;
                       }
                       return null;
                     },
@@ -202,8 +203,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   // ── Password Field ──
                   _buildTextField(
                     controller: _passwordController,
-                    label: 'Password',
-                    hintText: 'Create a password',
+                    label: l10n.authPassword,
+                    hintText: l10n.authCreatePasswordHint,
                     isDark: isDark,
                     obscureText: _obscurePassword,
                     suffixIcon: IconButton(
@@ -222,10 +223,10 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a password';
+                        return l10n.authPleaseEnterPassword;
                       }
                       if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return l10n.authPasswordMinLength;
                       }
                       return null;
                     },
@@ -236,8 +237,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   // ── Confirm Password Field ──
                   _buildTextField(
                     controller: _confirmPasswordController,
-                    label: 'Confirm Password',
-                    hintText: 'Confirm your password',
+                    label: l10n.authConfirmPassword,
+                    hintText: l10n.authConfirmPasswordHint,
                     isDark: isDark,
                     obscureText: _obscureConfirmPassword,
                     suffixIcon: IconButton(
@@ -259,10 +260,10 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
+                        return l10n.authPleaseConfirmPassword;
                       }
                       if (value != _passwordController.text) {
-                        return 'Passwords do not match';
+                        return l10n.authPasswordsDoNotMatch;
                       }
                       return null;
                     },
@@ -305,7 +306,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                     ),
                                   ),
                                 )
-                              : const Text('Sign Up'),
+                              : Text(l10n.authSignUp),
                         ),
                       );
                     },
@@ -360,7 +361,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Already have an account? ',
+                        l10n.authAlreadyHaveAccountPrompt,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w400,
@@ -379,8 +380,8 @@ class _SignUpPageState extends State<SignUpPage> {
                             ),
                           );
                         },
-                        child: const Text(
-                          'Login',
+                        child: Text(
+                          l10n.authLogin,
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w700,

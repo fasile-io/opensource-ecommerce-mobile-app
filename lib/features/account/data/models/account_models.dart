@@ -1,5 +1,99 @@
+import 'package:equatable/equatable.dart';
+import '../../../../core/constants/api_constants.dart';
+import '../../../../core/currency/currency_formatter.dart';
+
+final String _baseUrl = Uri.parse(bagistoEndpoint).origin;
+
 // Data models for Account Dashboard
 // Covers: Customer Profile, Addresses, Orders, Wishlist, Reviews
+
+// ─── Locale ───
+
+class ShopLocale extends Equatable {
+  final String id;
+  final int? numericId;
+  final String code;
+  final String name;
+  final String direction;
+
+  const ShopLocale({
+    required this.id,
+    this.numericId,
+    required this.code,
+    required this.name,
+    required this.direction,
+  });
+
+  factory ShopLocale.fromJson(Map<String, dynamic> json) {
+    final rawNumericId = json['_id'];
+
+    return ShopLocale(
+      id: json['id']?.toString() ?? '',
+      numericId: rawNumericId is int
+          ? rawNumericId
+          : int.tryParse(rawNumericId?.toString() ?? ''),
+      code: json['code']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      direction: json['direction']?.toString() ?? 'ltr',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      '_id': numericId,
+      'code': code,
+      'name': name,
+      'direction': direction,
+    };
+  }
+
+  @override
+  List<Object?> get props => [id, numericId, code, name, direction];
+}
+
+class ShopCurrency extends Equatable {
+  final String id;
+  final int? numericId;
+  final String code;
+  final String name;
+  final String symbol;
+
+  const ShopCurrency({
+    required this.id,
+    this.numericId,
+    required this.code,
+    required this.name,
+    required this.symbol,
+  });
+
+  factory ShopCurrency.fromJson(Map<String, dynamic> json) {
+    final rawNumericId = json['_id'];
+
+    return ShopCurrency(
+      id: json['id']?.toString() ?? '',
+      numericId: rawNumericId is int
+          ? rawNumericId
+          : int.tryParse(rawNumericId?.toString() ?? ''),
+      code: json['code']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      symbol: json['symbol']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      '_id': numericId,
+      'code': code,
+      'name': name,
+      'symbol': symbol,
+    };
+  }
+
+  @override
+  List<Object?> get props => [id, numericId, code, name, symbol];
+}
 
 // ─── Customer Profile ───
 
@@ -310,8 +404,7 @@ class RecentOrder {
   }
 
   String get formattedTotal {
-    final symbol = currencyCode == 'INR' ? '₹' : '\$';
-    return '$symbol${grandTotal.toStringAsFixed(2)}';
+    return CurrencyFormatter.formatAmount(grandTotal, currencyCode: currencyCode);
   }
 
   String get formattedDate {
@@ -350,6 +443,8 @@ class WishlistItem {
   final String? type;
   final double price;
   final double? specialPrice;
+  final String? apiFormattedPrice;
+  final String? apiFormattedSpecialPrice;
   final String? priceHtml;
   final String? baseImageUrl;
   final String? urlKey;
@@ -365,6 +460,8 @@ class WishlistItem {
     this.type,
     required this.price,
     this.specialPrice,
+    this.apiFormattedPrice,
+    this.apiFormattedSpecialPrice,
     this.priceHtml,
     this.baseImageUrl,
     this.urlKey,
@@ -451,6 +548,8 @@ class WishlistItem {
       type: product['type']?.toString(),
       price: parsedPrice,
       specialPrice: parsedSpecialPrice,
+      apiFormattedPrice: product['formattedPrice']?.toString(),
+      apiFormattedSpecialPrice: product['formattedSpecialPrice']?.toString(),
       priceHtml: priceHtmlStr,
       baseImageUrl: imageUrl,
       urlKey: product['urlKey']?.toString(),
@@ -458,9 +557,10 @@ class WishlistItem {
     );
   }
 
-  String get formattedPrice => '\$${price.toStringAsFixed(2)}';
-  String? get formattedSpecialPrice =>
-      specialPrice != null ? '\$${specialPrice!.toStringAsFixed(2)}' : null;
+  String get formattedPrice =>
+      apiFormattedPrice ?? CurrencyFormatter.formatAmount(price);
+  String? get formattedSpecialPrice => apiFormattedSpecialPrice ??
+      (specialPrice != null ? CurrencyFormatter.formatAmount(specialPrice) : null);
 }
 
 // ─── Product Review ───
@@ -514,7 +614,7 @@ class ProductReview {
             if (path != null && path.isNotEmpty) {
               pImage = path.startsWith('http')
                   ? path
-                  : 'https://nextjs.bagisto.com/storage/$path';
+                  : '$_baseUrl/storage/$path';
             }
           }
         } else if (images is List && images.isNotEmpty) {
@@ -526,7 +626,7 @@ class ProductReview {
 
       // Ensure relative paths get full URL
       if (pImage != null && pImage.startsWith('/')) {
-        pImage = 'https://nextjs.bagisto.com$pImage';
+        pImage = '$_baseUrl$pImage';
       }
     }
 
@@ -741,8 +841,7 @@ class CustomerOrder {
   /// Formatted grand total with currency symbol
   String get formattedTotal {
     final code = orderCurrencyCode ?? baseCurrencyCode ?? 'USD';
-    final symbol = code == 'INR' ? '\u20B9' : '\$';
-    return '$symbol${grandTotal.toStringAsFixed(2)}';
+    return CurrencyFormatter.formatAmount(grandTotal, currencyCode: code);
   }
 
   /// Formatted date: "8 Oct 2025"
@@ -799,6 +898,7 @@ class DownloadableProduct {
   final String? productName;
   final String name;
   final String fileName;
+  final String? downloadUrl;
   final String? type;
   final int? downloadBought;
   final int? downloadUsed;
@@ -814,6 +914,7 @@ class DownloadableProduct {
     this.productName,
     required this.name,
     required this.fileName,
+    this.downloadUrl,
     this.type,
     this.downloadBought,
     this.downloadUsed,
@@ -838,6 +939,7 @@ class DownloadableProduct {
       productName: json['productName']?.toString(),
       name: json['name']?.toString() ?? '',
       fileName: json['fileName']?.toString() ?? '',
+      downloadUrl: json['downloadUrl']?.toString(),
       type: json['type']?.toString(),
       downloadBought: _parseInt(json['downloadBought']),
       downloadUsed: _parseInt(json['downloadUsed']),
@@ -952,12 +1054,15 @@ double? _parseDouble(dynamic value) {
 
 class CompareItem {
   final String id; // IRI e.g. /api/shop/compare-items/606
-  final int numericId; // _id
+  final int numericId; // compare item _id
+  final int productNumericId; // product _id
   final String productName;
   final String? sku;
   final String? type;
   final double price;
   final double? specialPrice;
+  final String? apiFormattedPrice;
+  final String? apiFormattedSpecialPrice;
   final String? baseImageUrl;
   final String? description;
   final String? shortDescription;
@@ -973,11 +1078,14 @@ class CompareItem {
   const CompareItem({
     required this.id,
     required this.numericId,
+    required this.productNumericId,
     required this.productName,
     this.sku,
     this.type,
     required this.price,
     this.specialPrice,
+    this.apiFormattedPrice,
+    this.apiFormattedSpecialPrice,
     this.baseImageUrl,
     this.description,
     this.shortDescription,
@@ -1075,11 +1183,16 @@ class CompareItem {
       numericId: json['_id'] is int
           ? json['_id'] as int
           : int.tryParse(json['_id']?.toString() ?? '0') ?? 0,
+      productNumericId: product['_id'] is int
+          ? product['_id'] as int
+          : int.tryParse(product['_id']?.toString() ?? '0') ?? 0,
       productName: product['name']?.toString() ?? '',
       sku: product['sku']?.toString(),
       type: product['type']?.toString(),
       price: parsedPrice,
       specialPrice: parsedSpecialPrice,
+      apiFormattedPrice: product['formattedPrice']?.toString(),
+      apiFormattedSpecialPrice: product['formattedSpecialPrice']?.toString(),
       baseImageUrl: imageUrl,
       description: product['description']?.toString(),
       shortDescription: product['shortDescription']?.toString(),
@@ -1091,9 +1204,10 @@ class CompareItem {
     );
   }
 
-  String get formattedPrice => '\$${price.toStringAsFixed(2)}';
-  String? get formattedSpecialPrice =>
-      specialPrice != null ? '\$${specialPrice!.toStringAsFixed(2)}' : null;
+  String get formattedPrice =>
+      apiFormattedPrice ?? CurrencyFormatter.formatAmount(price);
+  String? get formattedSpecialPrice => apiFormattedSpecialPrice ??
+      (specialPrice != null ? CurrencyFormatter.formatAmount(specialPrice) : null);
 }
 
 // ─── Helpers ───
@@ -1264,8 +1378,7 @@ class OrderItem {
             cache['originalImageUrl']?.toString();
 
         if (rawImageUrl != null && rawImageUrl.startsWith('/')) {
-          const base = "https://nextjs.bagisto.com";
-          imageUrl = "$base$rawImageUrl";
+          imageUrl = "$_baseUrl$rawImageUrl";
         } else {
           imageUrl = rawImageUrl;
         }
@@ -1899,7 +2012,7 @@ class OrderDetail {
   /// Currency symbol
   String get currencySymbol {
     final code = orderCurrencyCode ?? baseCurrencyCode ?? 'USD';
-    return code == 'INR' ? '\u20B9' : '\$';
+    return CurrencyFormatter.symbolFor(code);
   }
 
   /// Format a monetary amount with currency

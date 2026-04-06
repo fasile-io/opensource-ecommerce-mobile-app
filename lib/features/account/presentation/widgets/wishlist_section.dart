@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 import '../bloc/wishlist_bloc.dart';
@@ -24,6 +25,8 @@ class WishlistSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.only(top: 24),
       child: Column(
@@ -32,7 +35,7 @@ class WishlistSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: SectionHeader(
-              title: 'Wishlist Items ($totalCount)',
+              title: l10n.accountWishlistItemsCount(totalCount),
               onViewAll: items.isNotEmpty
                   ? () {
                       final repository = context.read<AccountRepository>();
@@ -42,12 +45,10 @@ class WishlistSection extends StatelessWidget {
                           builder: (_) => RepositoryProvider.value(
                             value: repository,
                             child: BlocProvider(
-                              create: (_) =>
-                                  WishlistBloc(
-                                    repository: repository,
-                                    wishlistCubit: wishlistCubit,
-                                  )
-                                    ..add(const LoadWishlist()),
+                              create: (_) => WishlistBloc(
+                                repository: repository,
+                                wishlistCubit: wishlistCubit,
+                              )..add(const LoadWishlist()),
                               child: const WishlistPage(),
                             ),
                           ),
@@ -77,7 +78,9 @@ class WishlistSection extends StatelessWidget {
                           MaterialPageRoute(
                             builder: (_) => ProductDetailPage(
                               urlKey: item.urlKey!,
+                              productId: item.productNumericId?.toString(),
                               productName: item.name,
+                              productType: item.type,
                             ),
                           ),
                         );
@@ -95,6 +98,7 @@ class WishlistSection extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Container(
@@ -109,7 +113,7 @@ class WishlistSection extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            'No wishlist items',
+            l10n.accountNoWishlistItems,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,

@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/graphql/auth_mutations.dart';
+import '../../../../core/notifications/device_token_service.dart';
 import '../models/auth_models.dart';
 
 /// Repository for authentication API calls via GraphQL.
 /// Matches Bagisto API: createCustomerLogin, createCustomer,
 /// createForgotPassword, createLogout.
+/// Also handles FCM device token management.
 class AuthRepository {
   final GraphQLClient client;
 
@@ -13,17 +16,26 @@ class AuthRepository {
 
   /// Login with email + password
   /// Returns [CustomerLogin] with token on success.
+  /// Automatically includes FCM device token in the request if available.
   Future<CustomerLogin> login({
     required String email,
     required String password,
+    String? deviceToken,
   }) async {
     debugPrint('🔐 AuthRepo.login — email: $email');
+
+    // Get device token if not provided
+    final token = deviceToken ?? await DeviceTokenService.getDeviceToken();
 
     final result = await client.mutate(
       MutationOptions(
         document: gql(loginMutation),
         variables: {
-          'input': {'email': email, 'password': password},
+          'input': {
+            'email': email,
+            'password': password,
+            if (token != null) 'deviceToken': token,
+          },
         },
         fetchPolicy: FetchPolicy.noCache,
       ),
@@ -48,20 +60,32 @@ class AuthRepository {
       throw AuthException(loginResult.message ?? 'Login failed');
     }
 
-    debugPrint('🔐 AuthRepo.login — success, token: ${loginResult.token?.substring(0, 10)}...');
+    debugPrint(
+      '🔐 AuthRepo.login — success, token: ${loginResult.token?.substring(0, 10)}...',
+    );
+    if (token != null) {
+      debugPrint(
+        '🔐 AuthRepo.login — device token sent: ${token.substring(0, 20)}...',
+      );
+    }
     return loginResult;
   }
 
   /// Register a new customer.
-  /// Matches Next.js: firstName, lastName, email, password, confirmPassword
+  /// Matches Bagisto API: firstName, lastName, email, password, confirmPassword
+  /// Automatically includes FCM device token in the request if available.
   Future<Customer> register({
     required String firstName,
     required String lastName,
     required String email,
     required String password,
     required String confirmPassword,
+    String? deviceToken,
   }) async {
     debugPrint('📝 AuthRepo.register — $firstName $lastName <$email>');
+
+    // Get device token if not provided
+    final token = deviceToken ?? await DeviceTokenService.getDeviceToken();
 
     final result = await client.mutate(
       MutationOptions(
@@ -77,6 +101,7 @@ class AuthRepository {
             'isVerified': '1',
             'isSuspended': '0',
             'subscribedToNewsLetter': true,
+            if (token != null) 'deviceToken': token,
           },
         },
         fetchPolicy: FetchPolicy.noCache,
@@ -98,7 +123,14 @@ class AuthRepository {
     }
 
     final customer = Customer.fromJson(data);
-    debugPrint('📝 AuthRepo.register — success: ${customer.displayName}, token: ${customer.token}');
+    debugPrint(
+      '📝 AuthRepo.register — success: ${customer.displayName}, token: ${customer.token}',
+    );
+    if (token != null) {
+      debugPrint(
+        '📝 AuthRepo.register — device token sent: ${token.substring(0, 20)}...',
+      );
+    }
     return customer;
   }
 
@@ -133,32 +165,48 @@ class AuthRepository {
   }
 
   /// Logout (requires authenticated client)
+  /// Sends device token to API for cleanup.
+  /// Clears device token from local storage after logout.
   Future<bool> logout() async {
-    final result = await client.mutate(
-      MutationOptions(
-        document: gql(logoutMutation),
-        fetchPolicy: FetchPolicy.noCache,
-      ),
-    );
+    try {
+      // Get device token to send to API
+      final token = await DeviceTokenService.getDeviceToken();
 
-    if (result.hasException) {
-      final message = _extractErrorMessage(result.exception!);
-      throw AuthException(message);
+      final result = await client.mutate(
+        MutationOptions(
+          document: gql(logoutMutation),
+          variables: {
+            'input': {if (token != null) 'deviceToken': token},
+          },
+          fetchPolicy: FetchPolicy.noCache,
+        ),
+      );
+
+      if (result.hasException) {
+        final message = _extractErrorMessage(result.exception!);
+        throw AuthException(message);
+      }
+
+      final data = result.data?['createLogout']?['logout'];
+
+      // Clear device token on logout
+      await DeviceTokenService.clearDeviceToken();
+      debugPrint(
+        '🔐 AuthRepo.logout — device token sent to API and cleared locally',
+      );
+
+      return data?['success'] as bool? ?? false;
+    } catch (e) {
+      debugPrint('❌ AuthRepo.logout — error: $e');
+      // Still clear device token even if logout API fails
+      await DeviceTokenService.clearDeviceToken();
+      rethrow;
     }
-
-    final data = result.data?['createLogout']?['logout'];
-    return data?['success'] as bool? ?? false;
   }
 
   /// Extract a readable error message from GraphQL exceptions
   String _extractErrorMessage(OperationException exception) {
-    if (exception.graphqlErrors.isNotEmpty) {
-      return exception.graphqlErrors.first.message;
-    }
-    if (exception.linkException != null) {
-      return 'Network error. Please check your connection.';
-    }
-    return 'Something went wrong. Please try again.';
+    return ErrorMapper.getUserMessage(exception);
   }
 }
 

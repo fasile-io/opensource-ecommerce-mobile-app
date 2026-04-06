@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../bloc/review_bloc.dart';
 
@@ -20,9 +21,10 @@ class ReviewsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     final mode = context.read<ReviewBloc>().state.mode;
     final pageTitle =
-        mode == ReviewMode.product ? 'Product Reviews' : 'My Reviews';
+        mode == ReviewMode.product ? l10n.accountProductReviews : l10n.accountMyReviews;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -88,6 +90,7 @@ class ReviewsPage extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -101,7 +104,7 @@ class ReviewsPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Reviews Yet',
+              l10n.accountNoReviewsYet,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -111,7 +114,7 @@ class ReviewsPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Your product reviews will appear here.',
+              l10n.accountReviewsEmptyDescription,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -128,6 +131,7 @@ class ReviewsPage extends StatelessWidget {
 
   Widget _buildErrorState(BuildContext context, String? message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -141,7 +145,7 @@ class ReviewsPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              message ?? 'Something went wrong',
+              message ?? l10n.categorySomethingWentWrong,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -155,8 +159,8 @@ class ReviewsPage extends StatelessWidget {
               onPressed: () => context
                   .read<ReviewBloc>()
                   .add(const LoadReviews()),
-              child: const Text(
-                'Retry',
+              child: Text(
+                l10n.commonRetry,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -395,6 +399,7 @@ class _CountHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 8),
@@ -403,7 +408,7 @@ class _CountHeader extends StatelessWidget {
         children: [
           // "N Reviews" — Figma node: 245:5807
           Text(
-            '$totalCount Review${totalCount == 1 ? '' : 's'}',
+            '${totalCount} ${totalCount == 1 ? l10n.accountReviewSingular : l10n.accountReviewPlural}',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w500,
@@ -550,6 +555,7 @@ class _ReviewCard extends StatelessWidget {
   /// Figma node: 152:4078
   Widget _buildRatingRow(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,7 +641,7 @@ class _ReviewCard extends StatelessWidget {
         if (review.formattedDate.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
-            'Posted on ${review.formattedDate}',
+            l10n.accountPostedOn(review.formattedDate),
             style: const TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w400,

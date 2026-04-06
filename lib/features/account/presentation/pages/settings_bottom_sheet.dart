@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/currency/currency_cubit.dart';
+import '../../../../core/locale/locale_cubit.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_cubit.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../bloc/preferences_cubit.dart';
 import '../bloc/settings_cubit.dart';
 
 /// Settings Bottom Sheet — Figma node-id=248-8062 (pop-over-settings-light)
@@ -27,7 +31,9 @@ import '../bloc/settings_cubit.dart';
 ///   - Inactive toggle: neutral300 (#D4D4D4)
 
 class SettingsBottomSheet extends StatelessWidget {
-  const SettingsBottomSheet({super.key});
+  final BuildContext parentContext;
+
+  const SettingsBottomSheet({super.key, required this.parentContext});
 
   /// Show the settings bottom sheet from any context
   static Future<void> show(BuildContext context) {
@@ -35,12 +41,15 @@ class SettingsBottomSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider(
-        create: (_) => SettingsCubit(),
-        child: BlocProvider.value(
-          value: context.read<ThemeCubit>(),
-          child: const SettingsBottomSheet(),
-        ),
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => SettingsCubit()),
+          BlocProvider(create: (_) => PreferencesCubit()),
+          BlocProvider.value(value: context.read<CurrencyCubit>()),
+          BlocProvider.value(value: context.read<ThemeCubit>()),
+          BlocProvider.value(value: context.read<LocaleCubit>()),
+        ],
+        child: SettingsBottomSheet(parentContext: context),
       ),
     );
   }
@@ -110,13 +119,15 @@ class SettingsBottomSheet extends StatelessWidget {
   /// Header row: "Settings" title + close (X) button
   /// Figma node: 248:8064, 248:8065
   Widget _buildHeader(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.only(top: 20, bottom: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Settings',
+            l10n.accountSettings,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w500,
@@ -128,7 +139,7 @@ class SettingsBottomSheet extends StatelessWidget {
             onTap: () => Navigator.of(context).pop(),
             child: Semantics(
               button: true,
-              label: 'Close settings',
+              label: l10n.accountCloseSettings,
               child: Container(
                 width: 20,
                 height: 20,
@@ -149,6 +160,8 @@ class SettingsBottomSheet extends StatelessWidget {
   /// Change Theme button — Figma node: 248:8280
   /// Light bg (neutral100), 10px radius, 48px height, with sun/moon icon
   Widget _buildChangeThemeButton(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return BlocBuilder<ThemeCubit, ThemeMode>(
       builder: (context, themeMode) {
         final isCurrentlyDark = themeMode == ThemeMode.dark;
@@ -172,7 +185,7 @@ class SettingsBottomSheet extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Change Theme',
+                    l10n.accountChangeTheme,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
@@ -198,6 +211,192 @@ class SettingsBottomSheet extends StatelessWidget {
     );
   }
 
+  Widget _buildLanguageSelector(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return BlocBuilder<PreferencesCubit, PreferencesState>(
+      builder: (context, preferencesState) {
+        final availableLocales = preferencesState.locales;
+        final bgColor = isDark ? AppColors.neutral800 : AppColors.neutral100;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.accountLanguage,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: isDark ? AppColors.neutral200 : AppColors.neutral900,
+                  ),
+                ),
+              ),
+              if (availableLocales.isNotEmpty)
+                BlocBuilder<LocaleCubit, Locale?>(
+                  builder: (context, locale) {
+                    final selectedCode = locale?.languageCode;
+                    final dropdownValue = availableLocales.any(
+                      (item) => item.code == selectedCode,
+                    )
+                        ? selectedCode
+                        : availableLocales.first.code;
+
+                    return DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: dropdownValue,
+                        borderRadius: BorderRadius.circular(8),
+                        dropdownColor: isDark
+                            ? AppColors.neutral800
+                            : AppColors.white,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
+                          color: isDark
+                              ? AppColors.neutral200
+                              : AppColors.neutral900,
+                        ),
+                        items: availableLocales.map((locale) {
+                          return DropdownMenuItem<String>(
+                            value: locale.code,
+                            child: Text(locale.name),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          context.read<PreferencesCubit>().updateSelectedLocale(
+                            value,
+                          );
+                          Navigator.of(context).pop();
+                          parentContext.read<LocaleCubit>().setLocale(value);
+                        },
+                      ),
+                    );
+                  },
+                )
+              else if (preferencesState.isLoadingLocales)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (availableLocales.isEmpty)
+                Text(
+                  l10n.accountNoLanguagesAvailable,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: isDark ? AppColors.neutral400 : AppColors.neutral600,
+                  ),
+                )
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCurrencySelector(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return BlocBuilder<PreferencesCubit, PreferencesState>(
+      builder: (context, preferencesState) {
+        final bgColor = isDark ? AppColors.neutral800 : AppColors.neutral100;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.accountCurrency,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: isDark ? AppColors.neutral200 : AppColors.neutral900,
+                  ),
+                ),
+              ),
+              if (preferencesState.currencies.isNotEmpty)
+                BlocBuilder<CurrencyCubit, String?>(
+                  builder: (context, selectedCurrency) {
+                    final dropdownValue = preferencesState.currencies.any(
+                      (item) => item.code == selectedCurrency,
+                    )
+                        ? selectedCurrency
+                        : preferencesState.currencies.first.code;
+
+                    return DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: dropdownValue,
+                        borderRadius: BorderRadius.circular(8),
+                        dropdownColor: isDark
+                            ? AppColors.neutral800
+                            : AppColors.white,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w400,
+                          fontSize: 14,
+                          color: isDark
+                              ? AppColors.neutral200
+                              : AppColors.neutral900,
+                        ),
+                        items: preferencesState.currencies.map((currency) {
+                          return DropdownMenuItem<String>(
+                            value: currency.code,
+                            child: Text(currency.code),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          context.read<PreferencesCubit>().updateSelectedCurrency(
+                            value,
+                          );
+                          Navigator.of(context).pop();
+                          parentContext.read<CurrencyCubit>().setCurrency(value);
+                        },
+                      ),
+                    );
+                  },
+                )
+              else if (preferencesState.isLoadingCurrencies)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Text(
+                  'No currencies',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: isDark ? AppColors.neutral400 : AppColors.neutral600,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// Notifications section — Figma node: 248:8206
   /// Contains:
   ///   - Section header "Notifications" with master toggle
@@ -205,6 +404,8 @@ class SettingsBottomSheet extends StatelessWidget {
   ///   - "Orders" list item with toggle
   ///   - "Offers" list item with toggle
   Widget _buildNotificationsSection(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
@@ -214,7 +415,7 @@ class SettingsBottomSheet extends StatelessWidget {
           children: [
             // Section header — Figma node: 248:8207
             _buildSectionHeader(
-              label: 'Notifications',
+              label: l10n.accountNotifications,
               isDark: isDark,
               value: state.allNotifications,
               onChanged: (val) => cubit.toggleAllNotifications(val),
@@ -222,21 +423,21 @@ class SettingsBottomSheet extends StatelessWidget {
 
             // Sub-items with 2px gap — Figma node: 248:8167
             _buildToggleListItem(
-              label: 'All Notifcations',
+              label: l10n.accountAllNotifications,
               isDark: isDark,
               value: state.allNotifications,
               onChanged: (val) => cubit.toggleAllNotifications(val),
             ),
             const SizedBox(height: 2),
             _buildToggleListItem(
-              label: 'Orders',
+              label: l10n.accountOrders,
               isDark: isDark,
               value: state.ordersNotification,
               onChanged: (val) => cubit.toggleOrdersNotification(val),
             ),
             const SizedBox(height: 2),
             _buildToggleListItem(
-              label: 'Offers',
+              label: l10n.accountOffers,
               isDark: isDark,
               value: state.offersNotification,
               onChanged: (val) => cubit.toggleOffersNotification(val),
@@ -253,6 +454,8 @@ class SettingsBottomSheet extends StatelessWidget {
   ///   - "Track and Show Recently viewed products" list item with toggle
   ///   - "Show Search Tag" list item with toggle
   Widget _buildOfflineDataSection(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
@@ -263,25 +466,22 @@ class SettingsBottomSheet extends StatelessWidget {
           children: [
             // Section header — Figma node: 248:8246
             _buildSectionHeader(
-              label: 'Offline Data',
+              label: l10n.accountOfflineData,
               isDark: isDark,
               value: offlineMaster,
-              onChanged: (val) {
-                cubit.toggleTrackRecentlyViewed(val);
-                cubit.toggleShowSearchTag(val);
-              },
+              onChanged: (val) => cubit.toggleOfflineData(val),
             ),
 
             // Sub-items with 2px gap — Figma node: 248:8250
             _buildToggleListItem(
-              label: 'Track and Show Recently viewed products',
+              label: l10n.accountTrackRecentlyViewedProducts,
               isDark: isDark,
               value: state.trackRecentlyViewed,
               onChanged: (val) => cubit.toggleTrackRecentlyViewed(val),
             ),
             const SizedBox(height: 2),
             _buildToggleListItem(
-              label: 'Show Search Tag',
+              label: l10n.accountShowSearchTag,
               isDark: isDark,
               value: state.showSearchTag,
               onChanged: (val) => cubit.toggleShowSearchTag(val),

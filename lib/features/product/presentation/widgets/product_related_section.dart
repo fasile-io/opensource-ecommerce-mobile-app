@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../category/data/models/product_model.dart';
 
 /// Related Products horizontal scroll section
@@ -17,6 +18,7 @@ class ProductRelatedSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (relatedProducts.isEmpty) return const SizedBox.shrink();
 
     return Column(
@@ -25,7 +27,10 @@ class ProductRelatedSection extends StatelessWidget {
         // ── Section Header ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text('Related Product', style: AppTextStyles.text4(context)),
+          child: Text(
+            l10n.productRelatedProduct,
+            style: AppTextStyles.text4(context),
+          ),
         ),
 
         const SizedBox(height: 16),
@@ -61,6 +66,7 @@ class _RelatedProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const cardWidth = 142.0;
 
@@ -123,7 +129,7 @@ class _RelatedProductCard extends StatelessWidget {
 
             // ── Title ──
             Text(
-              product.name ?? 'Product',
+              product.name ?? l10n.productDefaultName,
               style: AppTextStyles.text5(context).copyWith(
                 color: isDark ? AppColors.neutral300 : AppColors.neutral800,
               ),
@@ -141,20 +147,22 @@ class _RelatedProductCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '\$${product.displayPrice.toStringAsFixed(2)}',
+                    product.formattedDisplayPrice,
                     style: AppTextStyles.priceText(context),
                   ),
                   if (product.originalPrice != null) ...[
                     const SizedBox(width: 3),
                     Text(
-                      '\$${product.originalPrice!.toStringAsFixed(2)}',
+                      product.formattedOriginalPrice ?? '',
                       style: AppTextStyles.originalPriceText(context),
                     ),
                   ],
                   if (product.discountPercent != null) ...[
                     const SizedBox(width: 3),
                     Text(
-                      '${product.discountPercent}% off',
+                      l10n.productDiscountOff(
+                        product.discountPercent.toString(),
+                      ),
                       style: AppTextStyles.discountText(context),
                     ),
                   ],
@@ -169,8 +177,10 @@ class _RelatedProductCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.successGreen,
                     borderRadius: BorderRadius.circular(6),
@@ -178,8 +188,7 @@ class _RelatedProductCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.star,
-                          size: 14, color: AppColors.white),
+                      const Icon(Icons.star, size: 14, color: AppColors.white),
                       const SizedBox(width: 1),
                       Text(
                         product.averageRating > 0
@@ -203,8 +212,9 @@ class _RelatedProductCard extends StatelessWidget {
                       fontFamily: 'Roboto',
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
-                      color:
-                          isDark ? AppColors.neutral100 : AppColors.neutral900,
+                      color: isDark
+                          ? AppColors.neutral100
+                          : AppColors.neutral900,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

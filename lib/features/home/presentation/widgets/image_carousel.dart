@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/home_models.dart';
 
@@ -14,7 +15,7 @@ class ImageCarousel extends StatefulWidget {
   const ImageCarousel({
     super.key,
     required this.images,
-    this.baseUrl = 'https://api-demo.bagisto.com',
+    this.baseUrl = '',
   });
 
   @override
@@ -70,7 +71,10 @@ class _ImageCarouselState extends State<ImageCarousel> {
             },
             itemBuilder: (context, index) {
               final banner = widget.images[index];
-              final url = banner.fullImageUrl(widget.baseUrl);
+              final effectiveBaseUrl = widget.baseUrl.isNotEmpty
+                  ? widget.baseUrl
+                  : Uri.parse(bagistoEndpoint).origin;
+              final url = banner.fullImageUrl(effectiveBaseUrl);
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: ClipRRect(

@@ -4,8 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/wishlist/wishlist_cubit.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../home/data/models/home_models.dart';
+import '../../../home/presentation/widgets/recently_viewed_products_section.dart';
 import '../../../category/data/models/product_model.dart';
 import '../../../category/data/models/category_model.dart';
 import '../../../category/data/repository/category_repository.dart';
@@ -47,15 +52,14 @@ class SearchPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (ctx) {
-        final bloc = SearchBloc(
-          repository: ctx.read<CategoryRepository>(),
-        )..add(InitSearch());
-        
+        final bloc = SearchBloc(repository: ctx.read<CategoryRepository>())
+          ..add(InitSearch());
+
         // If initialQuery is provided, submit search automatically
         if (initialQuery != null && initialQuery!.isNotEmpty) {
           bloc.add(SubmitSearch(initialQuery!));
         }
-        
+
         return bloc;
       },
       child: const _SearchPageView(),
@@ -79,20 +83,19 @@ class _SearchPageViewState extends State<_SearchPageView> {
   final SpeechToText _speechToText = SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
-  String _lastWords = '';
-
   @override
   void initState() {
     super.initState();
     // Get initial query from parent SearchPage
     final searchPage = context.findAncestorWidgetOfExactType<SearchPage>();
     final initialQuery = searchPage?.initialQuery;
-    
+
     // Auto-focus on the search field
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
       _initSpeech();
-      
+      context.read<WishlistCubit>().refreshWishlist();
+
       // Set initial query in controller and perform search
       if (initialQuery != null && initialQuery.isNotEmpty) {
         _searchController.text = initialQuery;
@@ -102,15 +105,17 @@ class _SearchPageViewState extends State<_SearchPageView> {
 
   /// Initialize speech to text
   void _initSpeech() async {
+    final l10n = AppLocalizations.of(context)!;
+
     try {
       _speechEnabled = await _speechToText.initialize(
         onError: (error) {
           debugPrint('Speech error: $error');
           if (mounted && error.toString().contains('error_permission')) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Microphone permission denied. Please enable it in settings.'),
-                duration: Duration(seconds: 3),
+              SnackBar(
+                content: Text(l10n.searchMicrophonePermissionDenied),
+                duration: const Duration(seconds: 3),
               ),
             );
           }
@@ -126,12 +131,14 @@ class _SearchPageViewState extends State<_SearchPageView> {
 
   /// Start speech recognition
   void _startListening() async {
+    final l10n = AppLocalizations.of(context)!;
+
     if (!_speechEnabled) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Speech recognition not available. Please check permissions in Settings > Apps > Bagisto > Microphone.'),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text(l10n.searchSpeechNotAvailable),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -157,7 +164,7 @@ class _SearchPageViewState extends State<_SearchPageView> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to start voice search: $e'),
+            content: Text(l10n.searchFailedToStartVoice('$e')),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -186,10 +193,9 @@ class _SearchPageViewState extends State<_SearchPageView> {
   /// Handle speech recognition result
   void _onSpeechResult(SpeechRecognitionResult result) {
     setState(() {
-      _lastWords = result.recognizedWords;
       _searchController.text = result.recognizedWords;
     });
-    
+
     if (result.finalResult) {
       _onSearchSubmitted(result.recognizedWords);
     }
@@ -250,6 +256,7 @@ class _SearchPageViewState extends State<_SearchPageView> {
 
   /// Navigate to Image Search screen
   void _navigateToImageSearch(BuildContext context) {
+    final searchBloc = context.read<SearchBloc>();
     // Create repository instances
     final permissionService = PermissionService();
     final imagePickerService = ImagePickerService();
@@ -271,9 +278,10 @@ class _SearchPageViewState extends State<_SearchPageView> {
       ),
     ).then((selectedLabel) {
       // If a label was selected, perform search
+      if (!mounted) return;
       if (selectedLabel != null && selectedLabel is String) {
         _searchController.text = selectedLabel;
-        context.read<SearchBloc>().add(SubmitSearch(selectedLabel));
+        searchBloc.add(SubmitSearch(selectedLabel));
       }
     });
   }
@@ -281,6 +289,7 @@ class _SearchPageViewState extends State<_SearchPageView> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -314,11 +323,16 @@ class _SearchPageViewState extends State<_SearchPageView> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.error_outline,
-                              size: 48, color: AppColors.neutral400),
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: AppColors.neutral400,
+                          ),
                           const SizedBox(height: 12),
-                          Text('Search failed',
-                              style: AppTextStyles.text4(context)),
+                          Text(
+                            l10n.searchFailedTitle,
+                            style: AppTextStyles.text4(context),
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             state.errorMessage ?? '',
@@ -342,6 +356,8 @@ class _SearchPageViewState extends State<_SearchPageView> {
 
   /// Search bar matching Figma navigation-bar/search
   Widget _buildSearchBar(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
@@ -382,7 +398,7 @@ class _SearchPageViewState extends State<_SearchPageView> {
                             : AppColors.neutral900,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'Search Product',
+                        hintText: l10n.searchHint,
                         hintStyle: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 18,
@@ -428,8 +444,8 @@ class _SearchPageViewState extends State<_SearchPageView> {
                             color: _isListening
                                 ? AppColors.primary500
                                 : (isDark
-                                    ? AppColors.neutral300
-                                    : AppColors.neutral500),
+                                      ? AppColors.neutral300
+                                      : AppColors.neutral500),
                           ),
                         ),
                       );
@@ -446,7 +462,12 @@ class _SearchPageViewState extends State<_SearchPageView> {
 
   /// Initial content: buttons, recent searches, categories
   Widget _buildInitialContent(
-      BuildContext context, SearchState state, bool isDark) {
+    BuildContext context,
+    SearchState state,
+    bool isDark,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -462,7 +483,7 @@ class _SearchPageViewState extends State<_SearchPageView> {
                   context,
                   isDark,
                   icon: Icons.image_outlined,
-                  label: 'Image Search',
+                  label: l10n.searchImageSearch,
                   onPressed: () {
                     _navigateToImageSearch(context);
                   },
@@ -488,16 +509,16 @@ class _SearchPageViewState extends State<_SearchPageView> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Recent Searches',
-                  style: AppTextStyles.text5(context).copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  l10n.searchRecentSearches,
+                  style: AppTextStyles.text5(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 GestureDetector(
                   onTap: () =>
                       context.read<SearchBloc>().add(ClearAllRecentSearches()),
                   child: Text(
-                    'Clear All',
+                    l10n.searchClearAll,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 12,
@@ -518,10 +539,10 @@ class _SearchPageViewState extends State<_SearchPageView> {
           // ── Top Categories ──
           if (state.topCategories.isNotEmpty) ...[
             Text(
-              'Top Categories',
-              style: AppTextStyles.text5(context).copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              l10n.searchTopCategories,
+              style: AppTextStyles.text5(
+                context,
+              ).copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -529,7 +550,8 @@ class _SearchPageViewState extends State<_SearchPageView> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: state.topCategories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 2),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(width: 2),
                 itemBuilder: (context, index) {
                   final cat = state.topCategories[index];
                   return _buildCategoryCircle(context, cat, isDark);
@@ -538,6 +560,10 @@ class _SearchPageViewState extends State<_SearchPageView> {
             ),
             const SizedBox(height: 32),
           ],
+
+          RecentlyViewedProductsSection(
+            onProductTap: (product) => _openRecentProduct(context, product),
+          ),
 
           const SizedBox(height: 16),
         ],
@@ -579,12 +605,9 @@ class _SearchPageViewState extends State<_SearchPageView> {
         ],
       ),
     );
-    
+
     if (onPressed != null) {
-      return GestureDetector(
-        onTap: onPressed,
-        child: buttonChild,
-      );
+      return GestureDetector(onTap: onPressed, child: buttonChild);
     }
     return buttonChild;
   }
@@ -592,7 +615,10 @@ class _SearchPageViewState extends State<_SearchPageView> {
   /// Recent search item — Figma: search-list component
   /// neutral/100 bg, 20px radius, search icon + text
   Widget _buildRecentSearchItem(
-      BuildContext context, String search, bool isDark) {
+    BuildContext context,
+    String search,
+    bool isDark,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: GestureDetector(
@@ -614,10 +640,9 @@ class _SearchPageViewState extends State<_SearchPageView> {
               Expanded(
                 child: Text(
                   search,
-                  style: AppTextStyles.text5(context).copyWith(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                  ),
+                  style: AppTextStyles.text5(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w400, fontSize: 16),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -640,7 +665,10 @@ class _SearchPageViewState extends State<_SearchPageView> {
 
   /// Category circle — Figma: 51px circle image + label
   Widget _buildCategoryCircle(
-      BuildContext context, CategoryModel category, bool isDark) {
+    BuildContext context,
+    CategoryModel category,
+    bool isDark,
+  ) {
     return GestureDetector(
       onTap: () => _openCategoryProducts(context, category),
       child: SizedBox(
@@ -660,8 +688,8 @@ class _SearchPageViewState extends State<_SearchPageView> {
                   ? CachedNetworkImage(
                       imageUrl: category.logoUrl!,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => const SizedBox.shrink(),
-                      errorWidget: (_, __, ___) => Icon(
+                      placeholder: (context, url) => const SizedBox.shrink(),
+                      errorWidget: (context, url, error) => Icon(
                         Icons.category_outlined,
                         size: 24,
                         color: AppColors.neutral400,
@@ -675,7 +703,7 @@ class _SearchPageViewState extends State<_SearchPageView> {
             ),
             const SizedBox(height: 7),
             Text(
-              category.name ?? '',
+              category.name,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -695,43 +723,97 @@ class _SearchPageViewState extends State<_SearchPageView> {
 
   /// Search results grid
   Widget _buildSearchResults(
-      BuildContext context, SearchState state, bool isDark) {
+    BuildContext context,
+    SearchState state,
+    bool isDark,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            '${state.totalCount} results found',
-            style: AppTextStyles.text6(context).copyWith(
-              color: AppColors.neutral500,
-            ),
+            l10n.searchResultsFound(state.totalCount),
+            style: AppTextStyles.text6(
+              context,
+            ).copyWith(color: AppColors.neutral500),
           ),
         ),
         const SizedBox(height: 12),
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.55,
-            ),
-            itemCount: state.searchResults.length,
-            itemBuilder: (context, index) {
-              return _buildProductCard(
-                  context, state.searchResults[index], isDark);
-            },
+          child: SingleChildScrollView(
+            child: LayoutBuilder(builder: (context, constraints) {
+            const crossAxisCount = 2;
+            const crossAxisSpacing = 12.0;
+            const horizontalPadding = 20.0 * 2;
+            final cardWidth =
+                (constraints.maxWidth - horizontalPadding - crossAxisSpacing * (crossAxisCount - 1)) /
+                    crossAxisCount;
+            // text: gap(10) + name 1 line + gap(7) + price + gap(7) + rating
+            // Keep a small safety buffer to avoid pixel overflows on iOS.
+            const textSectionHeight = 86.0;
+            final mainAxisExtent = cardWidth + textSectionHeight;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                GridView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: crossAxisSpacing,
+                    mainAxisSpacing: 16,
+                    mainAxisExtent: mainAxisExtent,
+                  ),
+                  itemCount: state.searchResults.length,
+                  itemBuilder: (context, index) {
+                    return _buildProductCard(
+                      context,
+                      state.searchResults[index],
+                      isDark,
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                RecentlyViewedProductsSection(
+                  onProductTap: (product) =>
+                      _openRecentProduct(context, product),
+                ),
+                const SizedBox(height: 16),
+              ],
+            );
+          }),
           ),
         ),
       ],
     );
   }
 
+  void _openRecentProduct(BuildContext context, HomeProduct product) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProductDetailPage(
+          urlKey: product.urlKey,
+          productId: product.numericId?.toString() ?? product.id,
+          productName: product.name,
+          productType: product.type,
+        ),
+      ),
+    );
+  }
+
   /// Product card matching Figma product-image-scroller component
   Widget _buildProductCard(
-      BuildContext context, ProductModel product, bool isDark) {
+    BuildContext context,
+    ProductModel product,
+    bool isDark,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+
     return GestureDetector(
       onTap: () {
         if (product.urlKey != null) {
@@ -739,7 +821,9 @@ class _SearchPageViewState extends State<_SearchPageView> {
             MaterialPageRoute(
               builder: (_) => ProductDetailPage(
                 urlKey: product.urlKey!,
+                productId: product.numericId?.toString() ?? product.id,
                 productName: product.name,
+                productType: product.type,
               ),
             ),
           );
@@ -765,30 +849,76 @@ class _SearchPageViewState extends State<_SearchPageView> {
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          placeholder: (_, __) => Container(
+                          placeholder: (context, url) => Container(
                             color: isDark
                                 ? AppColors.neutral800
                                 : AppColors.neutral100,
                           ),
-                          errorWidget: (_, __, ___) => Center(
-                            child: Icon(Icons.image_outlined,
-                                size: 40, color: AppColors.neutral400),
+                          errorWidget: (context, url, error) => Center(
+                            child: Icon(
+                              Icons.image_outlined,
+                              size: 40,
+                              color: AppColors.neutral400,
+                            ),
                           ),
                         )
                       : Center(
-                          child: Icon(Icons.image_outlined,
-                              size: 40, color: AppColors.neutral400),
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 40,
+                            color: AppColors.neutral400,
+                          ),
                         ),
                 ),
                 // Wishlist icon
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Icon(
-                    Icons.favorite_border,
-                    size: 24,
-                    color: isDark ? AppColors.neutral300 : AppColors.neutral500,
-                  ),
+                BlocBuilder<WishlistCubit, WishlistCubitState>(
+                  builder: (context, wishlistState) {
+                    final pid =
+                        product.numericId ??
+                        int.tryParse(product.id.split('/').last) ??
+                        0;
+                    final isWishlisted =
+                        pid > 0 && wishlistState.isWishlisted(pid);
+                    final isProcessing =
+                        pid > 0 && wishlistState.isProcessing(pid);
+
+                    return Positioned(
+                      top: 6,
+                      right: 6,
+                      child: GestureDetector(
+                        onTap: isProcessing
+                            ? null
+                            : () => _toggleWishlist(context, product),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withAlpha(200),
+                            shape: BoxShape.circle,
+                          ),
+                          child: isProcessing
+                              ? const Padding(
+                                  padding: EdgeInsets.all(6),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.neutral200,
+                                  ),
+                                )
+                              : Icon(
+                                  isWishlisted
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  size: 16,
+                                  color: isWishlisted
+                                      ? Colors.red
+                                      : isDark
+                                      ? AppColors.neutral700
+                                      : AppColors.neutral800,
+                                ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -799,51 +929,56 @@ class _SearchPageViewState extends State<_SearchPageView> {
           // Product name
           Text(
             product.name ?? '',
-            style: AppTextStyles.text5(context).copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 2,
+            style: AppTextStyles.text5(
+              context,
+            ).copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
 
           const SizedBox(height: 7),
 
           // Price
-          Row(
-            children: [
-              Text(
-                '\$${product.displayPrice.toStringAsFixed(2)}',
-                style: AppTextStyles.text5(context).copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppColors.white : AppColors.neutral900,
-                ),
-              ),
-              if (product.originalPrice != null) ...[
-                const SizedBox(width: 3),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Text(
-                  '\$${product.originalPrice!.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.neutral500,
-                    decoration: TextDecoration.lineThrough,
+                  product.formattedDisplayPrice,
+                  style: AppTextStyles.text5(context).copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.white : AppColors.neutral900,
                   ),
                 ),
-              ],
-              if (product.discountPercent != null) ...[
-                const SizedBox(width: 3),
-                Text(
-                  '${product.discountPercent}% off',
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.primary500,
+                if (product.originalPrice != null) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    product.formattedOriginalPrice ?? '',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.neutral500,
+                      decoration: TextDecoration.lineThrough,
+                    ),
                   ),
-                ),
+                ],
+                if (product.discountPercent != null) ...[
+                  const SizedBox(width: 3),
+                  Text(
+                    l10n.searchDiscountOff('${product.discountPercent}'),
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      color: AppColors.primary500,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
 
           const SizedBox(height: 7),
@@ -853,8 +988,10 @@ class _SearchPageViewState extends State<_SearchPageView> {
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.successGreen,
                     borderRadius: BorderRadius.circular(6),
@@ -888,28 +1025,79 @@ class _SearchPageViewState extends State<_SearchPageView> {
     );
   }
 
+  void _toggleWishlist(BuildContext context, ProductModel product) async {
+    final productId =
+        product.numericId ?? int.tryParse(product.id.split('/').last) ?? 0;
+    if (productId <= 0) return;
+
+    try {
+      final result = await context.read<WishlistCubit>().toggleWishlist(
+        productId: productId,
+      );
+      if (!context.mounted) return;
+
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.categoryLoginToManageWishlist,
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result
+                ? AppLocalizations.of(context)!.categoryAddedToWishlist
+                : AppLocalizations.of(context)!.categoryRemovedFromWishlist,
+          ),
+          backgroundColor: AppColors.successGreen,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(
+              context,
+            )!.categoryFailedToUpdateWishlist(
+              ErrorMapper.getUserMessage(e, context: 'updating wishlist'),
+            ),
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   /// Empty results state
   Widget _buildEmptyResults(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: AppColors.neutral400,
-          ),
+          Icon(Icons.search_off, size: 64, color: AppColors.neutral400),
           const SizedBox(height: 16),
-          Text(
-            'No products found',
-            style: AppTextStyles.text4(context),
-          ),
+          Text(l10n.searchNoProductsFound, style: AppTextStyles.text4(context)),
           const SizedBox(height: 8),
           Text(
-            'Try a different search term',
-            style: AppTextStyles.text6(context).copyWith(
-              color: AppColors.neutral500,
-            ),
+            l10n.searchTryDifferentTerm,
+            style: AppTextStyles.text6(
+              context,
+            ).copyWith(color: AppColors.neutral500),
           ),
         ],
       ),

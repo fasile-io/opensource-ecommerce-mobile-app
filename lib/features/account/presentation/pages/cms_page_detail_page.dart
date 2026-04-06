@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 
 /// CMS Page Detail Page
@@ -16,6 +17,7 @@ class CmsPageDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = isDark ? AppColors.neutral800 : AppColors.white;
     final textColor = isDark ? AppColors.neutral200 : AppColors.neutral900;
 
@@ -148,7 +150,7 @@ class CmsPageDetailPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'About this page',
+                      l10n.accountAboutThisPage,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w500,
@@ -175,7 +177,7 @@ class CmsPageDetailPage extends StatelessWidget {
             // Page ID display (for debugging/reference)
             Center(
               child: Text(
-                'Page ID: ${page.pageId}',
+                l10n.accountPageId(page.pageId),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w400,

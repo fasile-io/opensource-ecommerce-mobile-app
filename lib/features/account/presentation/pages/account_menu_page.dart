@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
@@ -20,6 +21,7 @@ import '../pages/edit_account_page.dart';
 import '../pages/orders_page.dart';
 import '../pages/preferences_bottom_sheet.dart';
 import '../pages/reviews_page.dart';
+import '../pages/settings_bottom_sheet.dart';
 import '../pages/wishlist_page.dart';
 import '../widgets/account_menu_item.dart';
 
@@ -76,6 +78,8 @@ class _AccountMenuBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     // Prefer live profile from AccountDashboardBloc if available,
     // otherwise fall back to the profile passed as constructor arg.
     CustomerProfile? liveProfile;
@@ -98,11 +102,11 @@ class _AccountMenuBody extends StatelessWidget {
       userEmail = effectiveProfile.email;
       initials = effectiveProfile.initials;
     } else if (authState is AuthAuthenticated) {
-      userName = authState.userName ?? 'User';
+      userName = authState.userName ?? l10n.accountUserFallback;
       userEmail = authState.userEmail ?? '';
       initials = _computeInitials(userName);
     } else {
-      userName = 'User';
+      userName = l10n.accountUserFallback;
       userEmail = '';
       initials = 'U';
     }
@@ -141,6 +145,8 @@ class _AccountMenuBody extends StatelessWidget {
     required String email,
     required String initials,
   }) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.only(left: 20, right: 20, top: 0),
       child: Row(
@@ -153,7 +159,7 @@ class _AccountMenuBody extends StatelessWidget {
               onTap: () => Navigator.of(context).pop(),
               borderRadius: BorderRadius.circular(10),
               child: Tooltip(
-                message: 'Back',
+                message: l10n.accountBack,
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: Icon(
@@ -228,6 +234,8 @@ class _AccountMenuBody extends StatelessWidget {
   /// Menu section — "Account Settings" header + menu items
   /// Figma node: 220:6774
   Widget _buildMenuSection(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -237,7 +245,7 @@ class _AccountMenuBody extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 7),
             child: Text(
-              'Account Settings',
+              l10n.accountSettings,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -249,63 +257,57 @@ class _AccountMenuBody extends StatelessWidget {
 
           // Menu items with 2px gap — Figma gap: 2px
           AccountMenuItem(
-            label: 'My Orders',
+            label: l10n.accountMyOrders,
             trailingIcon: Icons.chevron_right,
             onTap: () => _onMenuItemTap(context, AccountMenuAction.myOrders),
           ),
           const SizedBox(height: 2),
           AccountMenuItem(
-            label: 'My Downloadable Products',
+            label: l10n.accountMyDownloadableProducts,
             trailingIcon: Icons.chevron_right,
             onTap: () =>
                 _onMenuItemTap(context, AccountMenuAction.downloadableProducts),
           ),
           const SizedBox(height: 2),
           AccountMenuItem(
-            label: 'Wishlist',
+            label: l10n.accountWishlist,
             trailingIcon: Icons.chevron_right,
             onTap: () => _onMenuItemTap(context, AccountMenuAction.wishlist),
           ),
           const SizedBox(height: 2),
           AccountMenuItem(
-            label: 'Compare Products',
+            label: l10n.accountCompareProducts,
             trailingIcon: Icons.chevron_right,
             onTap: () =>
                 _onMenuItemTap(context, AccountMenuAction.compareProducts),
           ),
           const SizedBox(height: 2),
           AccountMenuItem(
-            label: 'Product Review',
+            label: l10n.accountProductReview,
             trailingIcon: Icons.chevron_right,
             onTap: () =>
                 _onMenuItemTap(context, AccountMenuAction.productReview),
           ),
           const SizedBox(height: 2),
           AccountMenuItem(
-            label: 'Address Book',
+            label: l10n.accountAddressBook,
             trailingIcon: Icons.chevron_right,
             onTap: () => _onMenuItemTap(context, AccountMenuAction.addressBook),
           ),
           const SizedBox(height: 2),
           AccountMenuItem(
-            label: 'Edit Account',
+            label: l10n.accountEditAccount,
             trailingIcon: Icons.chevron_right,
             onTap: () => _onMenuItemTap(context, AccountMenuAction.editAccount),
           ),
-          // const SizedBox(height: 2),
-          // AccountMenuItem(
-          //   label: 'Preferences',
-          //   trailingIcon: Icons.chevron_right,
-          //   onTap: () => _onMenuItemTap(context, AccountMenuAction.preferences),
-          // ),
           const SizedBox(height: 2),
-          AccountMenuItem(label: 'Logout', onTap: () => _onLogout(context)),
+          AccountMenuItem(
+            label: l10n.accountPreferences,
+            trailingIcon: Icons.chevron_right,
+            onTap: () => _onMenuItemTap(context, AccountMenuAction.preferences),
+          ),
           const SizedBox(height: 2),
-          // AccountMenuItem(
-          //   label: 'Settings',
-          //   trailingIcon: Icons.settings_outlined,
-          //   onTap: () => SettingsBottomSheet.show(context),
-          // ),
+          AccountMenuItem(label: l10n.accountLogout, onTap: () => _onLogout(context)),
         ],
       ),
     );
@@ -448,8 +450,11 @@ class _AccountMenuBody extends StatelessWidget {
               }
             });
         break;
+      case AccountMenuAction.settings:
+        SettingsBottomSheet.show(context);
+        break;
       case AccountMenuAction.preferences:
-        PreferencesBottomSheet.show(context);
+        PreferencesBottomSheet.show(context, showSettingsSection: false);
         break;
     }
   }
@@ -458,6 +463,7 @@ class _AccountMenuBody extends StatelessWidget {
   /// The page auto-pops via BlocListener when AuthUnauthenticated is emitted.
   void _onLogout(BuildContext context) {
     final authBloc = context.read<AuthBloc>();
+    final l10n = AppLocalizations.of(context)!;
 
     showDialog<void>(
       context: context,
@@ -470,7 +476,7 @@ class _AccountMenuBody extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
           title: Text(
-            'Logout',
+            l10n.accountLogout,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w600,
@@ -479,7 +485,7 @@ class _AccountMenuBody extends StatelessWidget {
             ),
           ),
           content: Text(
-            'Are you sure you want to logout?',
+            l10n.accountLogoutConfirmation,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w400,
@@ -491,7 +497,7 @@ class _AccountMenuBody extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
               child: Text(
-                'Cancel',
+                l10n.cartCancel,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w500,
@@ -506,8 +512,8 @@ class _AccountMenuBody extends StatelessWidget {
                 // Dispatch logout — BlocListener will auto-pop this page
                 authBloc.add(const AuthLogoutRequested());
               },
-              child: const Text(
-                'Logout',
+              child: Text(
+                l10n.accountLogout,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -547,5 +553,6 @@ enum AccountMenuAction {
   productReview,
   addressBook,
   editAccount,
+  settings,
   preferences,
 }

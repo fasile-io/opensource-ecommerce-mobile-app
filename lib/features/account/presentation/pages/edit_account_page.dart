@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/models/account_models.dart';
 import '../bloc/edit_account_bloc.dart';
@@ -71,6 +72,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return BlocConsumer<EditAccountBloc, EditAccountState>(
       listener: (context, state) {
@@ -149,12 +151,12 @@ class _EditAccountPageState extends State<EditAccountPage> {
                           // First Name *
                           _buildInputField(
                             context,
-                            label: 'First Name *',
+                            label: l10n.accountFirstNameRequiredLabel,
                             controller: _firstNameCtrl,
                             isDark: isDark,
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
-                                return 'First name is required';
+                                return l10n.accountFirstNameRequired;
                               }
                               return null;
                             },
@@ -163,12 +165,12 @@ class _EditAccountPageState extends State<EditAccountPage> {
                           // Last Name *
                           _buildInputField(
                             context,
-                            label: 'Last Name *',
+                            label: l10n.accountLastNameRequiredLabel,
                             controller: _lastNameCtrl,
                             isDark: isDark,
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
-                                return 'Last name is required';
+                                return l10n.accountLastNameRequired;
                               }
                               return null;
                             },
@@ -180,7 +182,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
                           // Phone
                           _buildInputField(
                             context,
-                            label: 'Phone',
+                            label: l10n.checkoutPhone,
                             controller: _phoneCtrl,
                             isDark: isDark,
                             keyboardType: TextInputType.phone,
@@ -198,7 +200,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
                           _buildActionTile(
                             context,
                             icon: Icons.email_outlined,
-                            label: 'Change Email',
+                            label: l10n.accountChangeEmail,
                             isDark: isDark,
                             onTap: () => _showChangeEmailDialog(context),
                           ),
@@ -209,7 +211,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
                           _buildActionTile(
                             context,
                             icon: Icons.lock_outline,
-                            label: 'Change Password',
+                            label: l10n.accountChangePassword,
                             isDark: isDark,
                             onTap: () => _showChangePasswordDialog(context),
                           ),
@@ -220,7 +222,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
                           _buildActionTile(
                             context,
                             icon: Icons.delete_outline,
-                            label: 'Delete Account',
+                            label: l10n.accountDeleteAccount,
                             isDark: isDark,
                             isDestructive: true,
                             onTap: () => _showDeleteAccountDialog(context),
@@ -247,6 +249,8 @@ class _EditAccountPageState extends State<EditAccountPage> {
   // ── App Bar — Figma: navigation-bar/title (node 245:6607) ──
 
   Widget _buildAppBar(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: isDark ? AppColors.neutral900 : AppColors.white,
       constraints: const BoxConstraints(minHeight: 48),
@@ -275,7 +279,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Text(
-                'Account Edit',
+                l10n.accountEditTitle,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -317,6 +321,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
   // ── Gender Dropdown — Figma: input-field with dropdown icon ──
 
   Widget _buildGenderField(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final borderColor = isDark ? AppColors.neutral700 : AppColors.neutral200;
     final textColor = isDark ? AppColors.neutral200 : AppColors.neutral800;
     final labelColor = isDark ? AppColors.neutral300 : AppColors.neutral800;
@@ -346,7 +351,9 @@ class _EditAccountPageState extends State<EditAccountPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          _selectedGender ?? '',
+                          _selectedGender != null
+                              ? _genderLabel(_selectedGender!, l10n)
+                              : '',
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w400,
@@ -379,7 +386,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
               color: bgColor,
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Text(
-                'Gender',
+                l10n.accountGender,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w400,
@@ -396,6 +403,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
 
   void _showGenderPicker(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet<String>(
       context: context,
       backgroundColor: isDark ? AppColors.neutral800 : AppColors.white,
@@ -413,7 +421,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Select Gender',
+                        l10n.accountSelectGender,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w600,
@@ -438,7 +446,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
               ),
               ..._genderOptions.map((gender) => ListTile(
                     title: Text(
-                      gender,
+                      _genderLabel(gender, l10n),
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 16,
@@ -471,6 +479,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
   // ── DOB Field — Figma: input-field with calendar icon ──
 
   Widget _buildDobField(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final borderColor = isDark ? AppColors.neutral700 : AppColors.neutral200;
     final textColor = isDark ? AppColors.neutral200 : AppColors.neutral800;
     final labelColor = isDark ? AppColors.neutral300 : AppColors.neutral800;
@@ -500,7 +509,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          _formatDob(_selectedDob),
+                          _formatDob(_selectedDob, l10n),
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w400,
@@ -533,7 +542,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
               color: bgColor,
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Text(
-                'DOB',
+                l10n.accountDob,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w400,
@@ -571,11 +580,21 @@ class _EditAccountPageState extends State<EditAccountPage> {
     }
   }
 
-  String _formatDob(DateTime? date) {
+  String _formatDob(DateTime? date, AppLocalizations l10n) {
     if (date == null) return '';
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    final months = [
+      l10n.monthJanShort,
+      l10n.monthFebShort,
+      l10n.monthMarShort,
+      l10n.monthAprShort,
+      l10n.monthMayShort,
+      l10n.monthJunShort,
+      l10n.monthJulShort,
+      l10n.monthAugShort,
+      l10n.monthSepShort,
+      l10n.monthOctShort,
+      l10n.monthNovShort,
+      l10n.monthDecShort,
     ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
@@ -588,6 +607,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
   // ── Subscribe Newsletters — Figma: checkbox-set (246:7610) ──
 
   Widget _buildNewsletterCheckbox(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     final textColor = isDark ? AppColors.neutral200 : AppColors.neutral800;
 
     return Padding(
@@ -626,7 +646,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
             ),
             const SizedBox(width: 4),
             Text(
-              'Subscribe Newsletters',
+              l10n.accountSubscribeNewsletters,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -703,6 +723,8 @@ class _EditAccountPageState extends State<EditAccountPage> {
 
   Widget _buildSaveButton(
       BuildContext context, bool isDark, EditAccountState state) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: isDark ? AppColors.neutral900 : AppColors.neutral50,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -732,8 +754,8 @@ class _EditAccountPageState extends State<EditAccountPage> {
                                 AlwaysStoppedAnimation<Color>(AppColors.white),
                           ),
                         )
-                      : const Text(
-                          'Save Profile',
+                      : Text(
+                          l10n.accountSaveProfile,
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w700,
@@ -781,6 +803,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
   // ── Change Email Dialog ──
 
   void _showChangeEmailDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final emailCtrl = TextEditingController();
     final passwordCtrl = TextEditingController();
     final dialogFormKey = GlobalKey<FormState>();
@@ -794,7 +817,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
           borderRadius: BorderRadius.circular(16),
         ),
         title: Text(
-          'Change Email',
+          l10n.accountChangeEmail,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -816,15 +839,15 @@ class _EditAccountPageState extends State<EditAccountPage> {
                   color: isDark ? AppColors.neutral200 : AppColors.neutral800,
                 ),
                 decoration: _dialogInputDecoration(
-                  'New Email',
+                  l10n.accountNewEmail,
                   isDark: isDark,
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Email is required';
+                    return l10n.accountEmailRequired;
                   }
                   if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) {
-                    return 'Enter a valid email';
+                    return l10n.accountEnterValidEmail;
                   }
                   return null;
                 },
@@ -839,12 +862,12 @@ class _EditAccountPageState extends State<EditAccountPage> {
                   color: isDark ? AppColors.neutral200 : AppColors.neutral800,
                 ),
                 decoration: _dialogInputDecoration(
-                  'Current Password',
+                  l10n.accountCurrentPassword,
                   isDark: isDark,
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) {
-                    return 'Password is required';
+                    return l10n.accountPasswordRequired;
                   }
                   return null;
                 },
@@ -856,7 +879,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(
-              'Cancel',
+              l10n.cartCancel,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w500,
@@ -875,8 +898,8 @@ class _EditAccountPageState extends State<EditAccountPage> {
                     ));
               }
             },
-            child: const Text(
-              'Change',
+            child: Text(
+              l10n.accountChange,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -893,6 +916,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
   // ── Change Password Dialog ──
 
   void _showChangePasswordDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final currentPwdCtrl = TextEditingController();
     final newPwdCtrl = TextEditingController();
     final confirmPwdCtrl = TextEditingController();
@@ -907,7 +931,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
           borderRadius: BorderRadius.circular(16),
         ),
         title: Text(
-          'Change Password',
+          l10n.accountChangePassword,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -929,12 +953,12 @@ class _EditAccountPageState extends State<EditAccountPage> {
                   color: isDark ? AppColors.neutral200 : AppColors.neutral800,
                 ),
                 decoration: _dialogInputDecoration(
-                  'Current Password',
+                  l10n.accountCurrentPassword,
                   isDark: isDark,
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) {
-                    return 'Current password is required';
+                    return l10n.accountCurrentPasswordRequired;
                   }
                   return null;
                 },
@@ -949,12 +973,12 @@ class _EditAccountPageState extends State<EditAccountPage> {
                   color: isDark ? AppColors.neutral200 : AppColors.neutral800,
                 ),
                 decoration: _dialogInputDecoration(
-                  'New Password',
+                  l10n.accountNewPassword,
                   isDark: isDark,
                 ),
                 validator: (v) {
                   if (v == null || v.length < 6) {
-                    return 'Password must be at least 6 characters';
+                    return l10n.authPasswordMinLength;
                   }
                   return null;
                 },
@@ -969,12 +993,12 @@ class _EditAccountPageState extends State<EditAccountPage> {
                   color: isDark ? AppColors.neutral200 : AppColors.neutral800,
                 ),
                 decoration: _dialogInputDecoration(
-                  'Confirm Password',
+                  l10n.accountConfirmPassword,
                   isDark: isDark,
                 ),
                 validator: (v) {
                   if (v != newPwdCtrl.text) {
-                    return 'Passwords do not match';
+                    return l10n.authPasswordsDoNotMatch;
                   }
                   return null;
                 },
@@ -986,7 +1010,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(
-              'Cancel',
+              l10n.cartCancel,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w500,
@@ -1006,8 +1030,8 @@ class _EditAccountPageState extends State<EditAccountPage> {
                     ));
               }
             },
-            child: const Text(
-              'Change',
+            child: Text(
+              l10n.accountChange,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -1024,6 +1048,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
   // ── Delete Account Dialog ──
 
   void _showDeleteAccountDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final passwordCtrl = TextEditingController();
     final dialogFormKey = GlobalKey<FormState>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1035,8 +1060,8 @@ class _EditAccountPageState extends State<EditAccountPage> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Text(
-          'Delete Account',
+        title: Text(
+          l10n.accountDeleteAccount,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -1050,7 +1075,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'This action is permanent and cannot be undone. All your data will be deleted.',
+                l10n.accountDeleteWarning,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
@@ -1067,12 +1092,12 @@ class _EditAccountPageState extends State<EditAccountPage> {
                   color: isDark ? AppColors.neutral200 : AppColors.neutral800,
                 ),
                 decoration: _dialogInputDecoration(
-                  'Enter your password',
+                  l10n.accountEnterYourPassword,
                   isDark: isDark,
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) {
-                    return 'Password is required';
+                    return l10n.accountPasswordRequired;
                   }
                   return null;
                 },
@@ -1084,7 +1109,7 @@ class _EditAccountPageState extends State<EditAccountPage> {
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(
-              'Cancel',
+              l10n.cartCancel,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w500,
@@ -1102,8 +1127,8 @@ class _EditAccountPageState extends State<EditAccountPage> {
                     );
               }
             },
-            child: const Text(
-              'Delete',
+            child: Text(
+              l10n.accountDelete,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -1149,5 +1174,18 @@ class _EditAccountPageState extends State<EditAccountPage> {
         borderSide: const BorderSide(color: Color(0xFFFB2C36)),
       ),
     );
+  }
+
+  String _genderLabel(String value, AppLocalizations l10n) {
+    switch (value.toLowerCase()) {
+      case 'male':
+        return l10n.accountGenderMale;
+      case 'female':
+        return l10n.accountGenderFemale;
+      case 'other':
+        return l10n.accountGenderOther;
+      default:
+        return value;
+    }
   }
 }

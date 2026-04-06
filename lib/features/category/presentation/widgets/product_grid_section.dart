@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
 import '../../data/models/product_model.dart';
 import '../../data/repository/category_repository.dart';
-import '../../../search/presentation/pages/search_page.dart';
+import '../../../product/presentation/pages/product_detail_page.dart';
 import '../pages/category_products_grid_page.dart';
 
 /// Products grid section
@@ -151,12 +152,15 @@ class _ProductCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        // Navigate to search page with product name as search query
-        if (product.name != null && product.name!.isNotEmpty) {
+        // Navigate directly to product detail page from category tab
+        if (product.urlKey != null && product.urlKey!.isNotEmpty) {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => SearchPage(
-                initialQuery: product.name,
+              builder: (_) => ProductDetailPage(
+                urlKey: product.urlKey!,
+                productId: product.numericId?.toString() ?? product.id,
+                productName: product.name,
+                productType: product.type,
               ),
             ),
           );
@@ -261,7 +265,7 @@ class _ProductCard extends StatelessWidget {
               style: AppTextStyles.text5(context).copyWith(
                 color: isDark ? AppColors.neutral300 : AppColors.neutral800,
               ),
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
 
@@ -281,30 +285,32 @@ class _ProductCard extends StatelessWidget {
   }
 
   Widget _buildPriceRow(BuildContext context) {
-    return Wrap(
-      spacing: 3,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        // Current price
-        Text(
-          '\$${product.displayPrice.toStringAsFixed(2)}',
-          style: AppTextStyles.priceText(context),
-        ),
-
-        // Original price (strikethrough)
-        if (product.originalPrice != null)
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           Text(
-            '\$${product.originalPrice!.toStringAsFixed(2)}',
-            style: AppTextStyles.originalPriceText(context),
+            product.formattedDisplayPrice,
+            style: AppTextStyles.priceText(context),
           ),
-
-        // Discount percentage
-        if (product.discountPercent != null)
-          Text(
-            '${product.discountPercent}% off',
-            style: AppTextStyles.discountText(context),
-          ),
-      ],
+          if (product.originalPrice != null) ...[
+            const SizedBox(width: 3),
+            Text(
+              product.formattedOriginalPrice ?? '',
+              style: AppTextStyles.originalPriceText(context),
+            ),
+          ],
+          if (product.discountPercent != null) ...[
+            const SizedBox(width: 3),
+            Text(
+              '${product.discountPercent}% off',
+              style: AppTextStyles.discountText(context),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -396,7 +402,9 @@ class _ProductCard extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update wishlist: $e'),
+          content: Text(
+            ErrorMapper.getUserMessage(e, context: 'updating wishlist'),
+          ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),

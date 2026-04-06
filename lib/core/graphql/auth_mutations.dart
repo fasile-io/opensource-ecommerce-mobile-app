@@ -50,8 +50,8 @@ const String forgotPasswordMutation = r'''
 ''';
 
 const String logoutMutation = r'''
-  mutation createLogout {
-    createLogout(input: {}) {
+  mutation createLogout($input: createLogoutInput!) {
+    createLogout(input: $input) {
       logout {
         success
         message

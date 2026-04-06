@@ -1,3 +1,5 @@
+import '../../../../core/currency/currency_formatter.dart';
+
 // Checkout models matching the real Bagisto Headless Commerce GraphQL schema.
 
 // ─── Country & State (from countries / countryStates queries) ──────────────
@@ -222,7 +224,7 @@ class ShippingRate {
     );
   }
 
-  String get displayPrice => formattedPrice ?? '\$${price.toStringAsFixed(2)}';
+  String get displayPrice => formattedPrice ?? CurrencyFormatter.formatAmount(price);
   String get displayLabel => label.isNotEmpty ? label : (methodTitle ?? method);
 }
 

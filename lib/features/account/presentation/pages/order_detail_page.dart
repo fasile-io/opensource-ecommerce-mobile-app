@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 import '../bloc/order_detail_bloc.dart';
@@ -22,7 +23,7 @@ import 'shipment_detail_bottom_sheet.dart';
 ///   - Bottom bar: Reorder + Write a Review
 ///
 /// Architecture:
-///   BlocProvider<OrderDetailBloc> → OrderDetailPage → Repository → GraphQL
+///   BlocProvider OrderDetailBloc -> OrderDetailPage -> Repository -> GraphQL
 class OrderDetailPage extends StatelessWidget {
   final int orderId;
   final String? orderNumber; // Pre-populated from list for instant AppBar title
@@ -54,6 +55,7 @@ class OrderDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -67,9 +69,10 @@ class OrderDetailPage extends StatelessWidget {
         title: BlocBuilder<OrderDetailBloc, OrderDetailState>(
           buildWhen: (prev, curr) => prev.order != curr.order,
           builder: (context, state) {
-            final title = state.order?.orderNumber ?? orderNumber ?? 'Order';
+            final title =
+                state.order?.orderNumber ?? orderNumber ?? l10n.accountOrderSingular;
             return Text(
-              'Orders $title',
+              l10n.accountOrdersWithNumber(title),
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -108,10 +111,10 @@ class OrderDetailPage extends StatelessWidget {
               context: context,
               barrierDismissible: false,
               builder: (dialogContext) => AlertDialog(
-                title: const Text('Reorder Successful'),
+                title: Text(l10n.accountReorderSuccessful),
                 content: Text(
                   itemsCount > 0
-                      ? '${state.successMessage!} \n\n$itemsCount items added to your cart.'
+                      ? l10n.accountReorderItemsAdded(state.successMessage!, itemsCount)
                       : state.successMessage!,
                 ),
                 actions: [
@@ -119,7 +122,7 @@ class OrderDetailPage extends StatelessWidget {
                     onPressed: () {
                       Navigator.of(dialogContext).pop();
                     },
-                    child: const Text('OK'),
+                    child: Text(l10n.accountOk),
                   ),
                   ElevatedButton(
                     onPressed: () {
@@ -131,7 +134,7 @@ class OrderDetailPage extends StatelessWidget {
                       backgroundColor: AppColors.primary500,
                       foregroundColor: AppColors.white,
                     ),
-                    child: const Text('Go to Cart'),
+                    child: Text(l10n.accountGoToCart),
                   ),
                 ],
               ),
@@ -163,6 +166,7 @@ class OrderDetailPage extends StatelessWidget {
 
   Widget _buildErrorState(BuildContext context, String? message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -176,7 +180,7 @@ class OrderDetailPage extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              message ?? 'Failed to load order details',
+              message ?? l10n.accountFailedToLoadOrderDetails,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -189,7 +193,7 @@ class OrderDetailPage extends StatelessWidget {
               onPressed: () {
                 context.read<OrderDetailBloc>().add(LoadOrderDetail(orderId));
               },
-              child: const Text('Try Again'),
+              child: Text(l10n.accountTryAgain),
             ),
           ],
         ),
@@ -216,11 +220,11 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   bool _invoicesExpanded = true;
   bool _shipmentsExpanded = true;
 
-  static const _tabs = ['Details', 'Invoices', 'Shipments'];
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+    final tabs = [l10n.accountDetails, l10n.accountInvoices, l10n.accountShipments];
 
     return Column(
       children: [
@@ -239,7 +243,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
                 const SizedBox(height: 16),
 
                 // Tab chips
-                _buildTabChips(isDark),
+                _buildTabChips(isDark, tabs),
 
                 const SizedBox(height: 16),
 
@@ -265,8 +269,12 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   Widget _buildStatusRow(bool isDark) {
     final order = widget.order;
     final chipColors = _getStatusColors(order.status);
+    final l10n = AppLocalizations.of(context)!;
 
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // Status chip — Figma: rounded-54, px-8 py-4, Bold 12
         Container(
@@ -296,7 +304,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
 
         // "Placed on {date}" — Figma: Roboto Regular 14, #737373
         Text(
-          'Placed on ${order.formattedDate}',
+          l10n.accountPlacedOn(order.formattedDate),
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w400,
@@ -312,20 +320,23 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   // Figma: active = bg rgba(255,105,0,0.1), border rgba(255,105,0,0.3), text #FF6900
   //        inactive = bg #F5F5F5, text #171717
   // Each tab has an icon: Details (info), Invoices (description), Shipments (local_shipping)
-  Widget _buildTabChips(bool isDark) {
+  Widget _buildTabChips(bool isDark, List<String> tabs) {
     const tabIcons = [
-      Icons.info_outline,        // Details
+      Icons.info_outline, // Details
       Icons.description_outlined, // Invoices
       Icons.local_shipping_outlined, // Shipments
     ];
 
-    return Row(
-      children: List.generate(_tabs.length, (index) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: List.generate(tabs.length, (index) {
         final isActive = index == _selectedTabIndex;
-        return Padding(
-          padding: EdgeInsets.only(right: index < _tabs.length - 1 ? 8 : 0),
-          child: GestureDetector(
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
             onTap: () => setState(() => _selectedTabIndex = index),
+            borderRadius: BorderRadius.circular(10),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
@@ -356,7 +367,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    _tabs[index],
+                    tabs[index],
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
@@ -378,13 +389,14 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   // ─── Details Tab ───
   Widget _buildDetailsTab(bool isDark) {
     final order = widget.order;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // "N Items Ordered" header — Figma: Roboto SemiBold 16, #262626
         Text(
-          '${order.items.length} Item${order.items.length == 1 ? '' : 's'} Ordered',
+          l10n.accountItemsOrdered(order.items.length),
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -412,32 +424,32 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
 
         // Billing Address
         _InfoCard(
-          title: 'Billing Address',
-          name: order.billingAddress?.fullName ?? 'N/A',
+          title: l10n.accountBillingAddress,
+          name: order.billingAddress?.fullName ?? l10n.accountNotAvailable,
           details: order.billingAddress?.formattedAddress,
         ),
         const SizedBox(height: 8),
 
         // Shipping Address
         _InfoCard(
-          title: 'Shipping Address',
-          name: order.shippingAddress?.fullName ?? 'N/A',
+          title: l10n.accountShippingAddress,
+          name: order.shippingAddress?.fullName ?? l10n.accountNotAvailable,
           details: order.shippingAddress?.formattedAddress,
         ),
         const SizedBox(height: 8),
 
         // Shipping Method
         _InfoCard(
-          title: 'Shipping Method',
-          name: order.shippingTitle ?? order.shippingMethod ?? 'N/A',
+          title: l10n.accountShippingMethod,
+          name: order.shippingTitle ?? order.shippingMethod ?? l10n.accountNotAvailable,
           details: null,
         ),
         const SizedBox(height: 8),
 
         // Payment Method
         _InfoCard(
-          title: 'Payment Method',
-          name: order.payment?.methodTitle ?? order.payment?.method ?? 'N/A',
+          title: l10n.accountPaymentMethod,
+          name: order.payment?.methodTitle ?? order.payment?.method ?? l10n.accountNotAvailable,
           details: null,
         ),
       ],
@@ -448,6 +460,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   // Figma node-id=2109-6148: "account-invoice-list"
   // Shows: "N Invoiced" header with toggle, simple invoice cards
   Widget _buildInvoicesTab(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     // Use invoices from the API state if available, fallback to order invoices
     final invoices = context.select<OrderDetailBloc, List<OrderInvoice>>(
       (bloc) => bloc.state.invoices,
@@ -458,7 +471,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
     final displayInvoices = invoices.isNotEmpty ? invoices : orderInvoices;
 
     if (displayInvoices.isEmpty) {
-      return _buildEmptyTabContent(isDark, 'No invoices for this order');
+      return _buildEmptyTabContent(isDark, l10n.accountNoInvoicesForOrder);
     }
 
     return Column(
@@ -471,7 +484,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${displayInvoices.length} Invoiced',
+                l10n.accountInvoicedCount(displayInvoices.length),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w500,
@@ -521,6 +534,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
   // Shows: "N Invoiced" header with toggle, simple shipment cards with date
   // Loads from API via bloc (customerOrderShipments)
   Widget _buildShipmentsTab(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     // Use shipments from the API state if available, fallback to order shipments
     final apiShipments = context.select<OrderDetailBloc, List<OrderShipment>>(
       (bloc) => bloc.state.shipments,
@@ -540,7 +554,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
     }
 
     if (displayShipments.isEmpty) {
-      return _buildEmptyTabContent(isDark, 'No shipments for this order');
+      return _buildEmptyTabContent(isDark, l10n.accountNoShipmentsForOrder);
     }
 
     return Column(
@@ -553,7 +567,7 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${displayShipments.length} Invoiced',
+                l10n.accountInvoicedCount(displayShipments.length),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w500,
@@ -672,8 +686,8 @@ class _OrderDetailBodyState extends State<_OrderDetailBody> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : const Text(
-                    'Reorder',
+                : Text(
+                    AppLocalizations.of(context)!.accountReorder,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w700,
@@ -749,6 +763,7 @@ class _ItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       width: double.infinity,
@@ -789,7 +804,7 @@ class _ItemCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     // "More info" link — Roboto Regular 14, #155DFC
                     Text(
-                      'More info',
+                      l10n.accountMoreInfo,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w400,
@@ -814,11 +829,11 @@ class _ItemCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _qtyRow('Ordered Qty', item.qtyOrdered, isDark),
+                    _qtyRow(l10n.accountOrderedQty, item.qtyOrdered, isDark),
                     const SizedBox(height: 4),
-                    _qtyRow('Shipped', item.qtyShipped, isDark),
+                    _qtyRow(l10n.accountShipped, item.qtyShipped, isDark),
                     const SizedBox(height: 4),
-                    _qtyRow('Invoiced', item.qtyInvoiced, isDark),
+                    _qtyRow(l10n.accountInvoiced, item.qtyInvoiced, isDark),
                   ],
                 ),
               ),
@@ -829,7 +844,7 @@ class _ItemCard extends StatelessWidget {
                 children: [
                   // "Unit Price" label — Roboto Regular 12, #737373
                   Text(
-                    'Unit Price',
+                    l10n.accountUnitPrice,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
@@ -855,7 +870,7 @@ class _ItemCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   // "Sub Total" label — Roboto Regular 12, #737373
                   Text(
-                    'Sub Total',
+                    l10n.accountSubTotalWithSpace,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
@@ -928,12 +943,13 @@ class _PriceBreakSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Price Break',
+          l10n.cartPriceBreak,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -943,21 +959,21 @@ class _PriceBreakSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _priceRow(
-          'SubTotal',
+          l10n.cartSubTotal,
           order.formatAmount(order.subTotal),
           isDark,
           isBold: false,
         ),
         const SizedBox(height: 8),
         _priceRow(
-          'Delivery Charges',
+          l10n.cartDeliveryCharges,
           order.formatAmount(order.shippingAmount ?? 0),
           isDark,
           isBold: false,
         ),
         const SizedBox(height: 8),
         _priceRow(
-          'Tax',
+          l10n.cartTax,
           order.formatAmount(order.taxAmount ?? 0),
           isDark,
           isBold: false,
@@ -965,17 +981,17 @@ class _PriceBreakSection extends StatelessWidget {
         if (order.discountAmount != null && order.discountAmount! > 0) ...[
           const SizedBox(height: 8),
           _priceRow(
-            'Discount',
+            l10n.cartDiscount,
             '-${order.formatAmount(order.discountAmount)}',
             isDark,
             isBold: false,
           ),
         ],
         const SizedBox(height: 8),
-        _priceRow('Grand Total', order.formattedTotal, isDark, isBold: true),
+        _priceRow(l10n.cartGrandTotal, order.formattedTotal, isDark, isBold: true),
         const SizedBox(height: 8),
         _priceRow(
-          'Total Paid',
+          l10n.accountTotalPaid,
           order.formatAmount(order.totalPaid),
           isDark,
           isBold: false,
@@ -983,7 +999,7 @@ class _PriceBreakSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _priceRow(
-          'Total Refunded',
+          l10n.accountTotalRefunded,
           order.formatAmount(order.totalRefunded),
           isDark,
           isBold: false,
@@ -991,7 +1007,7 @@ class _PriceBreakSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _priceRow(
-          'Total Due',
+          l10n.accountTotalDue,
           order.formatAmount(order.totalDue),
           isDark,
           isBold: false,
@@ -1129,6 +1145,7 @@ class _InvoiceListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return GestureDetector(
       onTap: onTap,
@@ -1148,7 +1165,7 @@ class _InvoiceListCard extends StatelessWidget {
           children: [
             // Invoice number — Figma: Roboto Medium 16, #171717
             Text(
-              'Invoice ${invoice.invoiceNumber}',
+              l10n.accountInvoiceNumber(invoice.invoiceNumber),
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w500,
@@ -1159,7 +1176,7 @@ class _InvoiceListCard extends StatelessWidget {
             const SizedBox(height: 6),
             // Date — Figma: Roboto Regular 14, #404040
             Text(
-              'Placed on :  ${invoice.formattedDate}',
+              l10n.accountPlacedOn(invoice.formattedDate),
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -1192,6 +1209,7 @@ class _ShipmentListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return GestureDetector(
       onTap: onTap,
@@ -1211,7 +1229,7 @@ class _ShipmentListCard extends StatelessWidget {
           children: [
             // Shipment number — Figma: Roboto Medium 16, #171717
             Text(
-              'Invoice ${shipment.shipmentNumber}',
+              l10n.accountShipmentNumber(shipment.shipmentNumber),
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w500,
@@ -1222,7 +1240,7 @@ class _ShipmentListCard extends StatelessWidget {
             const SizedBox(height: 6),
             // Date — Figma: Roboto Regular 14, #404040
             Text(
-              'Placed on :  ${shipment.formattedDate}',
+              l10n.accountPlacedOn(shipment.formattedDate),
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/models/filter_model.dart';
+import '../../../../l10n/app_localizations.dart';
 
 /// Sort bottom sheet matching Figma design
 /// Shows a list of sort options with a radio-style selection
@@ -33,6 +34,7 @@ class SortBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -63,7 +65,7 @@ class SortBottomSheet extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Sort By',
+                  l10n.categorySortByTitle,
                   style: AppTextStyles.text3(context),
                 ),
                 GestureDetector(
@@ -96,7 +98,7 @@ class SortBottomSheet extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        option.title,
+                        _titleFor(option, l10n),
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 14,
@@ -126,5 +128,24 @@ class SortBottomSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _titleFor(SortOption option, AppLocalizations l10n) {
+    switch (option.key) {
+      case 'name-asc':
+        return l10n.categorySortAZ;
+      case 'name-desc':
+        return l10n.categorySortZA;
+      case 'newest':
+        return l10n.categorySortNewest;
+      case 'oldest':
+        return l10n.categorySortOldest;
+      case 'price-asc':
+        return l10n.categorySortCheapest;
+      case 'price-desc':
+        return l10n.categorySortExpensive;
+      default:
+        return l10n.categorySort;
+    }
   }
 }

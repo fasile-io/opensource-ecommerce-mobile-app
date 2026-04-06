@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/category_model.dart';
 import '../bloc/category_bloc.dart';
 import '../widgets/category_chip_row.dart';
@@ -38,6 +39,7 @@ class CategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return BlocBuilder<CategoryBloc, CategoryState>(
       builder: (context, state) {
         if (state.status == CategoryStatus.loading &&
@@ -47,7 +49,7 @@ class CategoryPage extends StatelessWidget {
 
         if (state.status == CategoryStatus.error &&
             state.categories.isEmpty) {
-          return _buildError(context, state.errorMessage ?? 'Unknown error');
+          return _buildError(context, state.errorMessage ?? l10n.categoryUnknownError);
         }
 
         return _buildContent(context, state);
@@ -56,6 +58,7 @@ class CategoryPage extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context, CategoryState state) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -66,7 +69,7 @@ class CategoryPage extends StatelessWidget {
           children: [
             // ── Search Bar ──
             CategorySearchBar(
-              categoryName: state.selectedCategory?.name ?? 'Categories',
+              categoryName: state.selectedCategory?.name ?? l10n.categoryDefaultName,
               onSearchTap: () {
                 Navigator.push(
                   context,
@@ -118,7 +121,7 @@ class CategoryPage extends StatelessWidget {
                         const SizedBox(height: 32),
 
                       // ── Sub-category Sections ──
-                      ..._buildSubCategorySections(state.subCategories),
+                      ..._buildSubCategorySections(context, state.subCategories),
 
                       if (state.subCategories.isNotEmpty)
                         const SizedBox(height: 24),
@@ -142,20 +145,23 @@ class CategoryPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _buildSubCategorySections(List<CategoryModel> subCategories) {
+  List<Widget> _buildSubCategorySections(BuildContext context, List<CategoryModel> subCategories) {
     if (subCategories.isEmpty) return [];
+
+    final l10n = AppLocalizations.of(context)!;
 
     // Group sub-categories into sections (like "Tops" and "Bottoms" in Figma)
     // If we have grouped children, show them; otherwise show all as one section
     return [
       SubCategorySection(
-        title: 'Sub Categories',
+        title: l10n.categorySubCategories,
         categories: subCategories,
       ),
     ];
   }
 
   Widget _buildError(BuildContext context, String message) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Center(
         child: Column(
@@ -168,7 +174,7 @@ class CategoryPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Something went wrong',
+              l10n.categorySomethingWentWrong,
               style: AppTextStyles.text3(context),
             ),
             const SizedBox(height: 8),
@@ -186,7 +192,7 @@ class CategoryPage extends StatelessWidget {
                 backgroundColor: AppColors.primary500,
                 foregroundColor: AppColors.white,
               ),
-              child: const Text('Retry'),
+              child: Text(l10n.commonRetry),
             ),
           ],
         ),

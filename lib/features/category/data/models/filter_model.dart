@@ -205,13 +205,11 @@ class FilterOption {
 /// Maps to: SortByFields from nextjs-commerce/src/utils/constants.ts
 class SortOption {
   final String key;
-  final String title;
   final String sortKey;
   final bool reverse;
 
   const SortOption({
     required this.key,
-    required this.title,
     required this.sortKey,
     required this.reverse,
   });
@@ -222,37 +220,31 @@ class SortOption {
 const List<SortOption> sortByFields = [
   SortOption(
     key: 'name-asc',
-    title: 'From A-Z',
     sortKey: 'TITLE',
     reverse: false,
   ),
   SortOption(
     key: 'name-desc',
-    title: 'From Z-A',
     sortKey: 'TITLE',
     reverse: true,
   ),
   SortOption(
     key: 'newest',
-    title: 'Newest First',
     sortKey: 'NEWEST',
     reverse: true,
   ),
   SortOption(
     key: 'oldest',
-    title: 'Oldest First',
     sortKey: 'NEWEST',
     reverse: false,
   ),
   SortOption(
     key: 'price-asc',
-    title: 'Cheapest First',
     sortKey: 'PRICE',
     reverse: false,
   ),
   SortOption(
     key: 'price-desc',
-    title: 'Expensive First',
     sortKey: 'PRICE',
     reverse: true,
   ),

@@ -1,7 +1,14 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../auth/domain/services/auth_storage.dart';
 import '../../data/models/account_models.dart';
 import '../bloc/downloadable_products_bloc.dart';
 
@@ -21,6 +28,7 @@ class DownloadableProductsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -32,7 +40,7 @@ class DownloadableProductsPage extends StatelessWidget {
         leadingWidth: 60,
         titleSpacing: 0,
         title: Text(
-          'Downloadable Products',
+          l10n.accountDownloadableProducts,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -88,6 +96,7 @@ class DownloadableProductsPage extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -101,7 +110,7 @@ class DownloadableProductsPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Downloads Yet',
+              l10n.accountNoDownloadsYet,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -111,7 +120,7 @@ class DownloadableProductsPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Your downloaded products will appear here.',
+              l10n.accountDownloadsEmptyDescription,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -128,6 +137,7 @@ class DownloadableProductsPage extends StatelessWidget {
 
   Widget _buildErrorState(BuildContext context, String? message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -141,7 +151,7 @@ class DownloadableProductsPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              message ?? 'Something went wrong',
+              message ?? l10n.categorySomethingWentWrong,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -155,8 +165,8 @@ class DownloadableProductsPage extends StatelessWidget {
               onPressed: () => context
                   .read<DownloadableProductsBloc>()
                   .add(const LoadDownloadableProducts()),
-              child: const Text(
-                'Retry',
+              child: Text(
+                l10n.commonRetry,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -256,6 +266,7 @@ class _DownloadableProductsListState extends State<_DownloadableProductsList> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       children: [
@@ -306,7 +317,7 @@ class _DownloadableProductsListState extends State<_DownloadableProductsList> {
               const SizedBox(width: 8),
               // Count text
               Text(
-                '${widget.products.length} / ${widget.totalCount} Products',
+                l10n.accountProductsProgress(widget.products.length, widget.totalCount),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w500,
@@ -410,6 +421,7 @@ class _DownloadableProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       elevation: 0,
@@ -556,7 +568,7 @@ class _DownloadableProductCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${product.remainingDownloadsLabel} left',
+                      l10n.accountRemainingDownloadsLeft(product.remainingDownloadsLabel),
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w500,
@@ -582,8 +594,8 @@ class _DownloadableProductCard extends StatelessWidget {
                   Icons.download_rounded,
                   size: 18,
                 ),
-                label: const Text(
-                  'Download',
+                label: Text(
+                  l10n.accountDownload,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w600,
@@ -623,72 +635,320 @@ class _DownloadableProductCard extends StatelessWidget {
     }
   }
 
-  void _handleDownload(BuildContext context, DownloadableProduct product) {
-    // Show a dialog with download information
-    showDialog(
-      context: context,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark ? AppColors.neutral800 : AppColors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+  Future<void> _handleDownload(
+      BuildContext context, DownloadableProduct product) async {
+    final l10n = AppLocalizations.of(context)!;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final resolvedDownloadUrl = _resolveDownloadUrl(
+      product.downloadUrl?.trim() ?? '',
+      product,
+    );
+
+    if (resolvedDownloadUrl.isEmpty) {
+      scaffoldMessenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Download failed: download URL is missing'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
-          title: Text(
-            'Download',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.w600,
-              fontSize: 18,
-              color: isDark ? AppColors.neutral100 : AppColors.neutral900,
-            ),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'File: ${product.fileName}',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: isDark
-                        ? AppColors.neutral300
-                        : AppColors.neutral700,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Your download will start shortly. Check your downloads folder.',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: AppColors.neutral500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Close',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: AppColors.primary500,
+        );
+      return;
+    }
+
+    scaffoldMessenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(l10n.accountDownloadWillStartShortly),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 30),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+    try {
+      final token = await AuthStorage.getToken();
+      final dir = await getApplicationDocumentsDirectory();
+      final sanitizedName = _sanitizeFileName(
+        _resolvedDownloadFileName(product.fileName, resolvedDownloadUrl),
+      );
+      final savePath = '${dir.path}/$sanitizedName';
+      final requestHeaders = <String, String>{
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        'X-STOREFRONT-KEY': storefrontKey,
+      };
+
+      _logDownload('═══════════════════════════════════════════');
+      _logDownload('📦 [Downloadable Product Request]');
+      _logDownload('🔗 URL: $resolvedDownloadUrl');
+      _logDownload('🧾 Product ID: ${product.id}');
+      _logDownload('🧾 File Name: $sanitizedName');
+      _logDownload('💾 Save Path: $savePath');
+      _logDownload('📋 Headers: ${_maskSensitiveHeaders(requestHeaders)}');
+
+      final dio = Dio();
+      final response = await dio.download(
+        resolvedDownloadUrl,
+        savePath,
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveDataWhenStatusError: true,
+          headers: requestHeaders,
+          followRedirects: true,
+        ),
+      );
+
+      final statusCode = response.statusCode ?? 0;
+      _logDownload('✅ [Downloadable Product Response]');
+      _logDownload('🔢 Status Code: $statusCode');
+      _logDownload('📋 Response Headers: ${response.headers.map}');
+      _logDownload('📍 Real URI: ${response.realUri}');
+      _logDownload('═══════════════════════════════════════════');
+
+      if (statusCode < 200 || statusCode >= 300) {
+        throw DioException.badResponse(
+          statusCode: statusCode,
+          requestOptions: response.requestOptions,
+          response: response,
         );
-      },
+      }
+
+      final finalSavePath = await _normalizeDownloadedFilePath(
+        initialSavePath: savePath,
+        response: response,
+      );
+
+      scaffoldMessenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('${product.fileName} downloaded'),
+            backgroundColor: AppColors.success500,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () => OpenFilex.open(finalSavePath),
+            ),
+          ),
+        );
+    } catch (e) {
+      final message = e is DioException
+          ? _dioErrorMessage(e)
+          : e.toString();
+      scaffoldMessenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $message'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
+  }
+
+  String _resolveDownloadUrl(String downloadUrl, DownloadableProduct product) {
+    if (downloadUrl.isNotEmpty) {
+      final uri = Uri.tryParse(downloadUrl);
+      if (uri == null) {
+        return downloadUrl;
+      }
+      if (uri.hasScheme && uri.host.isNotEmpty) {
+        return downloadUrl;
+      }
+
+      final baseUri = Uri.parse(bagistoEndpoint);
+      return baseUri.resolveUri(uri).toString();
+    }
+
+    final baseUrl = Uri.parse(bagistoEndpoint).origin;
+    return '$baseUrl/downloadable/download/purchased/${product.id}';
+  }
+
+  String _resolvedDownloadFileName(String fileName, String downloadUrl) {
+    final trimmedName = fileName.trim();
+    final parsedUrl = Uri.tryParse(downloadUrl);
+    final urlFileName = parsedUrl != null && parsedUrl.pathSegments.isNotEmpty
+        ? parsedUrl.pathSegments.last
+        : '';
+    final urlExtension = urlFileName.contains('.')
+        ? urlFileName.substring(urlFileName.lastIndexOf('.'))
+        : '';
+
+    if (trimmedName.isEmpty) {
+      if (urlFileName.isNotEmpty) {
+        return urlFileName;
+      }
+      return urlExtension.isNotEmpty ? 'download$urlExtension' : 'download_file';
+    }
+
+    final hasExtension = trimmedName.contains('.');
+    if (hasExtension || urlExtension.isEmpty) {
+      return trimmedName;
+    }
+
+    return '$trimmedName$urlExtension';
+  }
+
+  String _sanitizeFileName(String fileName) {
+    final sanitized = fileName.replaceAll(RegExp(r'[^\w\s\-.]'), '_').trim();
+    return sanitized.isEmpty ? 'download_file' : sanitized;
+  }
+
+  Future<String> _normalizeDownloadedFilePath({
+    required String initialSavePath,
+    required Response<dynamic> response,
+  }) async {
+    final currentExtension = _extensionFromPath(initialSavePath);
+    if (currentExtension.isNotEmpty) {
+      return initialSavePath;
+    }
+
+    final inferredExtension = _inferExtensionFromResponse(response);
+    if (inferredExtension.isEmpty) {
+      return initialSavePath;
+    }
+
+    final renamedPath = '$initialSavePath$inferredExtension';
+    final file = File(initialSavePath);
+    if (!await file.exists()) {
+      return initialSavePath;
+    }
+
+    final renamedFile = await file.rename(renamedPath);
+    return renamedFile.path;
+  }
+
+  String _inferExtensionFromResponse(Response<dynamic> response) {
+    final contentTypeHeader = response.headers.value(Headers.contentTypeHeader);
+    final normalizedContentType = contentTypeHeader?.split(';').first.trim();
+    final contentTypeExtension = switch (normalizedContentType) {
+      'application/pdf' => '.pdf',
+      'image/png' => '.png',
+      'image/jpeg' => '.jpg',
+      'image/jpg' => '.jpg',
+      'image/webp' => '.webp',
+      _ => '',
+    };
+
+    if (contentTypeExtension.isNotEmpty) {
+      return contentTypeExtension;
+    }
+
+    return _extensionFromPath(response.realUri.path);
+  }
+
+  String _extensionFromPath(String path) {
+    final sanitizedPath = path.split('?').first;
+    final lastSlash = sanitizedPath.lastIndexOf('/');
+    final fileName = lastSlash >= 0
+        ? sanitizedPath.substring(lastSlash + 1)
+        : sanitizedPath;
+    final dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex <= 0 || dotIndex == fileName.length - 1) {
+      return '';
+    }
+
+    return fileName.substring(dotIndex).toLowerCase();
+  }
+
+  String _dioErrorMessage(DioException error) {
+    final statusCode = error.response?.statusCode;
+    final responseData = error.response?.data;
+
+    _logDownload('❌ [Downloadable Product Error]');
+    _logDownload('🔗 URL: ${error.requestOptions.uri}');
+    _logDownload(
+      '📋 Request Headers: ${_maskSensitiveHeaders(error.requestOptions.headers)}',
     );
+    _logDownload('🔢 Status Code: $statusCode');
+    _logDownload('📋 Response Headers: ${error.response?.headers.map}');
+    _logDownload('📦 Response Body: ${_truncateForLog(responseData)}');
+    _logDownload('⚠️ Dio Message: ${error.message}');
+    _logDownload('═══════════════════════════════════════════');
+
+    if (statusCode == 401) {
+      return 'Unauthorized. Please log in again.';
+    }
+
+    if (statusCode == 403) {
+      return 'You cannot download this file.';
+    }
+
+    if (statusCode == 429) {
+      return 'Rate limit exceeded. Please wait a moment and try again.';
+    }
+
+    if (responseData is Map<String, dynamic>) {
+      final message = responseData['message']?.toString();
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
+    }
+
+    return error.message ?? 'Unknown error';
+  }
+
+  Map<String, dynamic> _maskSensitiveHeaders(Map<dynamic, dynamic> headers) {
+    return headers.map((key, value) {
+      final headerKey = key.toString();
+      final lowerKey = headerKey.toLowerCase();
+      if (lowerKey == 'authorization') {
+        return MapEntry(headerKey, _maskBearerToken(value?.toString() ?? ''));
+      }
+      if (lowerKey == 'x-storefront-key') {
+        return MapEntry(headerKey, _maskValue(value?.toString() ?? ''));
+      }
+      return MapEntry(headerKey, value);
+    });
+  }
+
+  String _maskBearerToken(String rawValue) {
+    if (!rawValue.startsWith('Bearer ')) {
+      return _maskValue(rawValue);
+    }
+
+    final token = rawValue.substring(7);
+    return 'Bearer ${_maskValue(token)}';
+  }
+
+  String _maskValue(String value) {
+    if (value.length <= 8) {
+      return '***';
+    }
+
+    return '${value.substring(0, 4)}***${value.substring(value.length - 4)}';
+  }
+
+  String _truncateForLog(dynamic data) {
+    final text = data?.toString() ?? 'null';
+    if (text.length <= 1500) {
+      return text;
+    }
+
+    return '${text.substring(0, 1500)}...';
+  }
+
+  void _logDownload(String message) {
+    debugPrint(message);
+    // ignore: avoid_print
+    print(message);
   }
 }

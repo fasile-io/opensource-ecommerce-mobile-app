@@ -328,6 +328,9 @@ class AccountQueries {
               _id
               name
               price
+              formattedPrice
+              specialPrice
+              formattedSpecialPrice
               sku
               type
               description
@@ -402,9 +405,15 @@ class AccountQueries {
             _id
             product {
               id
+              _id
               name
               description
               price
+              formattedPrice
+              specialPrice
+              formattedSpecialPrice
+              sku
+              type
               baseImageUrl
               urlKey
             }
@@ -596,8 +605,11 @@ class AccountQueries {
           edges {
             node {
               id
+              _id
               sku
               name
+              price
+              total
               qtyOrdered
               qtyShipped
               qtyInvoiced
@@ -926,6 +938,27 @@ mutation createReorderOrder($input: createReorderOrderInput!) {
     }
   ''';
 
+  /// Get available currencies for currency selection
+  static const String getCurrencies = r'''
+    query allCurrency {
+      currencies {
+        edges {
+          node {
+            id
+            _id
+            code
+            name
+            symbol
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+  ''';
+
   /// Get customer downloadable products (cursor-based pagination)
   /// Bagisto API query: customerDownloadableProducts(first: Int, after: String)
   /// Returns: DownloadableProductCursorConnection with product details
@@ -939,6 +972,7 @@ mutation createReorderOrder($input: createReorderOrderInput!) {
             productName
             name
             fileName
+            downloadUrl
             type
             downloadBought
             downloadUsed

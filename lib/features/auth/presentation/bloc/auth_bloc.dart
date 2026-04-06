@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import '../../data/repository/auth_repository.dart';
 import '../../domain/services/auth_storage.dart';
 import '../../../../core/graphql/graphql_client.dart';
+import '../../../../core/notifications/device_token_service.dart';
 
 // ─── EVENTS ───
 
@@ -17,11 +18,16 @@ abstract class AuthEvent extends Equatable {
 class AuthLoginRequested extends AuthEvent {
   final String email;
   final String password;
+  final String? deviceToken;
 
-  const AuthLoginRequested({required this.email, required this.password});
+  const AuthLoginRequested({
+    required this.email,
+    required this.password,
+    this.deviceToken,
+  });
 
   @override
-  List<Object?> get props => [email, password];
+  List<Object?> get props => [email, password, deviceToken];
 }
 
 class AuthRegisterRequested extends AuthEvent {
@@ -30,6 +36,7 @@ class AuthRegisterRequested extends AuthEvent {
   final String email;
   final String password;
   final String confirmPassword;
+  final String? deviceToken;
 
   const AuthRegisterRequested({
     required this.firstName,
@@ -37,6 +44,7 @@ class AuthRegisterRequested extends AuthEvent {
     required this.email,
     required this.password,
     required this.confirmPassword,
+    this.deviceToken,
   });
 
   @override
@@ -46,6 +54,7 @@ class AuthRegisterRequested extends AuthEvent {
     email,
     password,
     confirmPassword,
+    deviceToken,
   ];
 }
 
@@ -88,16 +97,18 @@ class AuthAuthenticated extends AuthState {
   final String? userName;
   final String? userEmail;
   final String? userId;
+  final String? deviceToken;
 
   const AuthAuthenticated({
     required this.token,
     this.userName,
     this.userEmail,
     this.userId,
+    this.deviceToken,
   });
 
   @override
-  List<Object?> get props => [token, userName, userEmail, userId];
+  List<Object?> get props => [token, userName, userEmail, userId, deviceToken];
 }
 
 class AuthUnauthenticated extends AuthState {
@@ -150,11 +161,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final name = await AuthStorage.getUserName();
       final email = await AuthStorage.getUserEmail();
       final userId = await AuthStorage.getUserId();
+      final deviceToken = await DeviceTokenService.getDeviceToken();
       emit(AuthAuthenticated(
         token: token,
         userName: name,
         userEmail: email,
         userId: userId,
+        deviceToken: deviceToken,
       ));
     } else {
       emit(const AuthUnauthenticated());
@@ -167,9 +180,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
+      // Get device token if not provided
+      final deviceToken =
+          event.deviceToken ?? await DeviceTokenService.getDeviceToken();
+
       final loginResult = await repository.login(
         email: event.email,
         password: event.password,
+        deviceToken: deviceToken,
       );
 
       final token = loginResult.token ?? loginResult.apiToken ?? '';
@@ -177,7 +195,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(const AuthError(message: 'No token received from server'));
         return;
       } else {
-        print("tpoken ===>${token.isEmpty} ");
+        debugPrint("✅ Login token received");
       }
 
       final userId = loginResult.id;
@@ -185,7 +203,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Persist token and user info
       await AuthStorage.saveToken(token);
       await AuthStorage.saveUserInfo(
-        name: event.email, // will be replaced with actual name
+        name: event.email,
         email: event.email,
         userId: userId,
       );
@@ -197,6 +215,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           userName: event.email,
           userEmail: event.email,
           userId: userId,
+          deviceToken: deviceToken,
         ),
       );
     } on AuthException catch (e) {
@@ -214,12 +233,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
+      // Get device token if not provided
+      final deviceToken =
+          event.deviceToken ?? await DeviceTokenService.getDeviceToken();
+
       final customer = await repository.register(
         firstName: event.firstName,
         lastName: event.lastName,
         email: event.email,
         password: event.password,
         confirmPassword: event.confirmPassword,
+        deviceToken: deviceToken,
       );
 
       debugPrint('✅ Registration successful — ${customer.displayName}');
@@ -239,6 +263,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             userName: customer.displayName,
             userEmail: customer.email,
             userId: customer.id,
+            deviceToken: deviceToken,
           ),
         );
       } else {
@@ -286,6 +311,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       debugPrint('Logout API error (clearing local data anyway): $e');
     }
     await AuthStorage.clearAuth();
+    // Device token is cleared by repository.logout()
     // Clear GraphQL HiveStore cache on logout
     await GraphQLClientProvider.clearCache();
     debugPrint('✅ Logged out');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../category/data/models/product_model.dart';
 import '../bloc/product_detail_bloc.dart';
 
@@ -13,6 +14,7 @@ class ProductDescriptionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final description = product.description ?? product.shortDescription ?? '';
     if (description.isEmpty) return const SizedBox.shrink();
 
@@ -34,7 +36,7 @@ class ProductDescriptionSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Details',
+                l10n.productDetails,
                 style: AppTextStyles.text4(context),
               ),
               const SizedBox(height: 16),
@@ -51,7 +53,7 @@ class ProductDescriptionSection extends StatelessWidget {
                         .add(ToggleDescriptionExpanded());
                   },
                   child: Text(
-                    isExpanded ? 'Show Less' : 'Load More',
+                    isExpanded ? l10n.productShowLess : l10n.productLoadMore,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 14,

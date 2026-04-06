@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 
@@ -73,14 +74,14 @@ class DownloadableProductsState extends Equatable {
 
   @override
   List<Object?> get props => [
-        status,
-        products,
-        totalCount,
-        hasNextPage,
-        endCursor,
-        isLoadingMore,
-        errorMessage,
-      ];
+    status,
+    products,
+    totalCount,
+    hasNextPage,
+    endCursor,
+    isLoadingMore,
+    errorMessage,
+  ];
 }
 
 // ─── BLOC ───
@@ -90,7 +91,7 @@ class DownloadableProductsBloc
   final AccountRepository repository;
 
   DownloadableProductsBloc({required this.repository})
-      : super(const DownloadableProductsState()) {
+    : super(const DownloadableProductsState()) {
     on<LoadDownloadableProducts>(_onLoad);
     on<LoadMoreDownloadableProducts>(_onLoadMore);
     on<ClearDownloadableProductsMessage>(_onClearMessage);
@@ -100,28 +101,33 @@ class DownloadableProductsBloc
     LoadDownloadableProducts event,
     Emitter<DownloadableProductsState> emit,
   ) async {
-    emit(state.copyWith(
-      status: DownloadableProductsStatus.loading,
-    ));
+    emit(state.copyWith(status: DownloadableProductsStatus.loading));
 
     try {
       final result = await repository.getCustomerDownloadableProducts(
         first: 10,
       );
 
-      emit(state.copyWith(
-        status: DownloadableProductsStatus.loaded,
-        products: result.products,
-        totalCount: result.totalCount,
-        hasNextPage: result.hasNextPage,
-        endCursor: result.endCursor,
-      ));
+      emit(
+        state.copyWith(
+          status: DownloadableProductsStatus.loaded,
+          products: result.products,
+          totalCount: result.totalCount,
+          hasNextPage: result.hasNextPage,
+          endCursor: result.endCursor,
+        ),
+      );
     } catch (e) {
       debugPrint('❌ DownloadableProductsBloc._onLoad error: $e');
-      emit(state.copyWith(
-        status: DownloadableProductsStatus.error,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          status: DownloadableProductsStatus.error,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading downloadable products',
+          ),
+        ),
+      );
     }
   }
 
@@ -139,20 +145,27 @@ class DownloadableProductsBloc
         after: state.endCursor,
       );
 
-      emit(state.copyWith(
-        status: DownloadableProductsStatus.loaded,
-        products: [...state.products, ...result.products],
-        totalCount: result.totalCount,
-        hasNextPage: result.hasNextPage,
-        endCursor: result.endCursor,
-        isLoadingMore: false,
-      ));
+      emit(
+        state.copyWith(
+          status: DownloadableProductsStatus.loaded,
+          products: [...state.products, ...result.products],
+          totalCount: result.totalCount,
+          hasNextPage: result.hasNextPage,
+          endCursor: result.endCursor,
+          isLoadingMore: false,
+        ),
+      );
     } catch (e) {
       debugPrint('❌ DownloadableProductsBloc._onLoadMore error: $e');
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading more products',
+          ),
+        ),
+      );
     }
   }
 

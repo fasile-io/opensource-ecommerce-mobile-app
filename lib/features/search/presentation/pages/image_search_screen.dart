@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image/image.dart' as img;
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/label_model.dart';
 import '../bloc/image_search_bloc.dart';
 
@@ -36,10 +37,11 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Image Search'),
+          title: Text(l10n.searchImageSearch),
           centerTitle: true,
           elevation: 0,
           backgroundColor:
@@ -94,8 +96,8 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
                     const SizedBox(height: 20),
                     Text(
                       state.processingProgress > 0
-                          ? 'Processing... ${state.processingProgress}%'
-                          : 'Opening camera...',
+                          ? l10n.searchProcessing(state.processingProgress)
+                          : l10n.searchOpeningCamera,
                       style: const TextStyle(fontSize: 16),
                     ),
                   ],
@@ -114,6 +116,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
   /// Build crop editor UI
   Widget _buildCropEditor(BuildContext context, ImageSearchState state) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // Crop canvas
@@ -175,7 +178,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
                     context.read<ImageSearchBloc>().add(CaptureImageEvent());
                   },
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Retake'),
+                  label: Text(l10n.searchRetake),
                 ),
               ),
               const SizedBox(width: 12),
@@ -183,7 +186,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () => _processCroppedImage(context, state),
                   icon: const Icon(Icons.check),
-                  label: const Text('Search'),
+                  label: Text(l10n.searchSearch),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
@@ -207,7 +210,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
 
       if (decodedImage == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to process image')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.searchFailedToProcessImage)),
         );
         return;
       }
@@ -262,6 +265,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
   /// Show recognized labels with list layout (matching screenshots)
   Widget _buildLabelsView(BuildContext context, ImageSearchState state) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         // Image preview (smaller)
@@ -286,7 +290,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
                 children: [
                   // Header
                   Text(
-                    'Recognized Objects',
+                    l10n.searchRecognizedObjects,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -316,7 +320,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Result:',
+                          l10n.searchResult,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -368,7 +372,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
                     context.read<ImageSearchBloc>().add(CaptureImageEvent());
                   },
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Try Again'),
+                  label: Text(l10n.searchTryAgain),
                 ),
               ),
               const SizedBox(width: 12),
@@ -385,7 +389,7 @@ class _ImageSearchScreenState extends State<ImageSearchScreen> {
                     disabledBackgroundColor: Colors.grey,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Search'),
+                  child: Text(l10n.searchSearch),
                 ),
               ),
             ],

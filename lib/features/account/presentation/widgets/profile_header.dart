@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 
 /// Profile header with avatar, name, email, and settings icon
@@ -21,8 +22,9 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
-    final name = profile?.displayName ?? fallbackName ?? 'User';
+    final name = profile?.displayName ?? fallbackName ?? l10n.accountUserFallback;
     final email = profile?.email ?? fallbackEmail ?? '';
     final initials =
         profile?.initials ?? (name.isNotEmpty ? name[0].toUpperCase() : 'U');

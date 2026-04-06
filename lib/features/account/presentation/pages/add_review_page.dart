@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/graphql/graphql_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/repository/account_repository.dart';
 import '../bloc/add_review_bloc.dart';
@@ -54,9 +55,10 @@ class AddReviewPage extends StatefulWidget {
     } catch (_) {
       final authState = context.read<AuthBloc>().state;
       if (authState is! AuthAuthenticated) {
+        final l10n = AppLocalizations.of(context)!;
         // Not logged in — show a message and bail out.
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to write a review')),
+          SnackBar(content: Text(l10n.accountPleaseLoginToWriteReview)),
         );
         return Future.value(null);
       }
@@ -102,16 +104,18 @@ class _AddReviewPageState extends State<AddReviewPage> {
   }
 
   void _onSubmit() {
+    final l10n = AppLocalizations.of(context)!;
+
     if (!_formKey.currentState!.validate()) return;
     if (_selectedRating == 0) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Please select a rating'),
+          SnackBar(
+            content: Text(l10n.accountPleaseSelectRating),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
       return;
@@ -129,6 +133,7 @@ class _AddReviewPageState extends State<AddReviewPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -139,7 +144,7 @@ class _AddReviewPageState extends State<AddReviewPage> {
         automaticallyImplyLeading: false,
         titleSpacing: 20,
         title: Text(
-          'Add Review',
+          l10n.accountAddReview,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -166,7 +171,7 @@ class _AddReviewPageState extends State<AddReviewPage> {
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: Text(state.successMessage ?? 'Review submitted!'),
+                  content: Text(state.successMessage ?? l10n.accountReviewSubmitted),
                   backgroundColor: AppColors.successGreen,
                   behavior: SnackBarBehavior.floating,
                   duration: const Duration(seconds: 2),
@@ -222,13 +227,13 @@ class _AddReviewPageState extends State<AddReviewPage> {
                         // ── Nick Name Field ──
                         _buildTextField(
                           context,
-                          label: 'Nick Name',
+                          label: l10n.accountNickName,
                           isRequired: true,
                           controller: _nickNameController,
-                          hintText: 'Enter your name',
+                          hintText: l10n.accountEnterYourName,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Name is required';
+                              return l10n.accountNameRequired;
                             }
                             return null;
                           },
@@ -239,13 +244,13 @@ class _AddReviewPageState extends State<AddReviewPage> {
                         // ── Summary Field ──
                         _buildTextField(
                           context,
-                          label: 'Summary',
+                          label: l10n.accountSummary,
                           controller: _summaryController,
-                          hintText: 'Brief summary of your review',
+                          hintText: l10n.accountReviewSummaryHint,
                           maxLines: 3,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Summary is required';
+                              return l10n.accountSummaryRequired;
                             }
                             return null;
                           },
@@ -256,13 +261,13 @@ class _AddReviewPageState extends State<AddReviewPage> {
                         // ── Review Field ──
                         _buildTextField(
                           context,
-                          label: 'Review',
+                          label: l10n.accountReview,
                           controller: _reviewController,
-                          hintText: 'Write your detailed review here',
+                          hintText: l10n.accountDetailedReviewHint,
                           maxLines: 5,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'Review is required';
+                              return l10n.accountReviewRequired;
                             }
                             return null;
                           },
@@ -356,13 +361,14 @@ class _AddReviewPageState extends State<AddReviewPage> {
 
   Widget _buildRatingSection(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // "Rating" label
         Text(
-          'Rating',
+          l10n.accountRating,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w400,
@@ -510,6 +516,8 @@ class _AddReviewPageState extends State<AddReviewPage> {
   // ──────────────────────────────────────────────
 
   Widget _buildSubmitButton(BuildContext context, bool isSubmitting) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       child: SizedBox(
@@ -536,8 +544,8 @@ class _AddReviewPageState extends State<AddReviewPage> {
                     color: AppColors.white,
                   ),
                 )
-              : const Text(
-                  'Submit Review',
+              : Text(
+                  l10n.accountSubmitReview,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w700,

@@ -1,12 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../bloc/compare_bloc.dart';
 import '../../../cart/presentation/bloc/cart_bloc.dart';
 import '../../../product/presentation/pages/product_detail_page.dart';
+
+String _localizedCartMessage(BuildContext context, String message) {
+  final l10n = AppLocalizations.of(context)!;
+  switch (message) {
+    case 'Product added to cart successfully':
+      return l10n.cartAddedToCartSuccess;
+    default:
+      return message;
+  }
+}
 
 /// Compare Products Page — Figma node-id=1866-5772
 ///
@@ -18,13 +30,14 @@ import '../../../product/presentation/pages/product_detail_page.dart';
 ///   - Attribute rows alternate between gray headers (#F5F5F5) and white value rows
 ///
 /// Architecture:
-///   BlocProvider<CompareBloc> → CompareProductsPage → Repository → GraphQL
+///   BlocProvider CompareBloc -> CompareProductsPage -> Repository -> GraphQL
 class CompareProductsPage extends StatelessWidget {
   const CompareProductsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -36,7 +49,7 @@ class CompareProductsPage extends StatelessWidget {
         leadingWidth: 60,
         titleSpacing: 0,
         title: Text(
-          'Compare Products',
+          l10n.accountCompareProducts,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -61,11 +74,13 @@ class CompareProductsPage extends StatelessWidget {
             context.read<CartBloc>().add(ClearCartMessage());
           }
           if (cartState.successMessage != null) {
+            final message =
+                _localizedCartMessage(context, cartState.successMessage!);
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: Text(cartState.successMessage!),
+                  content: Text(message),
                   backgroundColor: AppColors.successGreen,
                   behavior: SnackBarBehavior.floating,
                   duration: const Duration(seconds: 2),
@@ -75,59 +90,58 @@ class CompareProductsPage extends StatelessWidget {
           }
         },
         child: BlocConsumer<CompareBloc, CompareState>(
-        listener: (context, state) {
-          if (state.successMessage != null) {
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                SnackBar(
-                  content: Text(state.successMessage!),
-                  backgroundColor: AppColors.successGreen,
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            context.read<CompareBloc>().add(const ClearCompareMessage());
-          }
-          if (state.errorMessage != null &&
-              state.status != CompareStatus.error) {
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                SnackBar(
-                  content: Text(state.errorMessage!),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            context.read<CompareBloc>().add(const ClearCompareMessage());
-          }
-        },
-        builder: (context, state) {
-          if (state.status == CompareStatus.loading &&
-              state.items.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          listener: (context, state) {
+            if (state.successMessage != null) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.successMessage!),
+                    backgroundColor: AppColors.successGreen,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              context.read<CompareBloc>().add(const ClearCompareMessage());
+            }
+            if (state.errorMessage != null &&
+                state.status != CompareStatus.error) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.errorMessage!),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              context.read<CompareBloc>().add(const ClearCompareMessage());
+            }
+          },
+          builder: (context, state) {
+            if (state.status == CompareStatus.loading && state.items.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          if (state.status == CompareStatus.error &&
-              state.items.isEmpty) {
-            return _buildErrorState(context, state.errorMessage);
-          }
+            if (state.status == CompareStatus.error && state.items.isEmpty) {
+              return _buildErrorState(context, state.errorMessage);
+            }
 
-          if (state.items.isEmpty) {
-            return _buildEmptyState(context);
-          }
+            if (state.items.isEmpty) {
+              return _buildEmptyState(context);
+            }
 
-          return _CompareTable(items: state.items);
-        },
-      ),
+            return _CompareTable(items: state.items);
+          },
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -141,7 +155,7 @@ class CompareProductsPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Products to Compare',
+              l10n.accountNoProductsToCompare,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -151,7 +165,7 @@ class CompareProductsPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Add products to compare from the product detail page.',
+              l10n.accountAddProductsToCompareHint,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -168,6 +182,7 @@ class CompareProductsPage extends StatelessWidget {
 
   Widget _buildErrorState(BuildContext context, String? message) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -181,7 +196,7 @@ class CompareProductsPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              message ?? 'Something went wrong',
+              message ?? l10n.categorySomethingWentWrong,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -192,11 +207,10 @@ class CompareProductsPage extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: () => context
-                  .read<CompareBloc>()
-                  .add(const LoadCompareItems()),
-              child: const Text(
-                'Retry',
+              onPressed: () =>
+                  context.read<CompareBloc>().add(const LoadCompareItems()),
+              child: Text(
+                l10n.commonRetry,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -226,15 +240,6 @@ enum _AttrType {
   seller,
 }
 
-const _attrLabels = <_AttrType, String>{
-  _AttrType.productCard: 'Products',
-  _AttrType.sku: 'SKU',
-  _AttrType.description: 'Description',
-  _AttrType.shortDescription: 'Short Description',
-  _AttrType.activity: 'Activity',
-  _AttrType.seller: 'Seller',
-};
-
 /// Width of each product column (Figma: 162px content + 20px padding each side)
 const double _kProductColumnWidth = 202.0;
 
@@ -254,10 +259,12 @@ class _CompareTable extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: _AttrType.values
-            .expand((attr) => [
-                  _buildHeaderRow(context, attr),
-                  _buildValueRow(context, attr),
-                ])
+            .expand(
+              (attr) => [
+                _buildHeaderRow(context, attr),
+                _buildValueRow(context, attr),
+              ],
+            )
             .toList(),
       ),
     );
@@ -266,12 +273,13 @@ class _CompareTable extends StatelessWidget {
   /// Gray section header: "Products", "SKU", "Description", etc.
   Widget _buildHeaderRow(BuildContext context, _AttrType attr) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       color: isDark ? AppColors.neutral800 : AppColors.neutral100,
       child: Text(
-        _attrLabels[attr] ?? '',
+        _attrLabel(l10n, attr),
         style: TextStyle(
           fontFamily: 'Roboto',
           fontWeight: FontWeight.w400,
@@ -280,6 +288,23 @@ class _CompareTable extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _attrLabel(AppLocalizations l10n, _AttrType attr) {
+    switch (attr) {
+      case _AttrType.productCard:
+        return l10n.accountProducts;
+      case _AttrType.sku:
+        return l10n.productSku;
+      case _AttrType.description:
+        return l10n.accountDescription;
+      case _AttrType.shortDescription:
+        return l10n.accountShortDescription;
+      case _AttrType.activity:
+        return l10n.accountActivity;
+      case _AttrType.seller:
+        return l10n.accountSeller;
+    }
   }
 
   /// Value row — horizontally scrollable row of product value cells
@@ -338,7 +363,9 @@ class _ProductCard extends StatelessWidget {
                         MaterialPageRoute(
                           builder: (_) => ProductDetailPage(
                             urlKey: item.urlKey!,
+                            productId: item.productNumericId.toString(),
                             productName: item.productName,
+                            productType: item.type,
                           ),
                         ),
                       );
@@ -356,7 +383,9 @@ class _ProductCard extends StatelessWidget {
                       boxShadow: item.urlKey != null
                           ? [
                               BoxShadow(
-                                color: AppColors.primary500.withOpacity(0.2),
+                                color: AppColors.primary500.withValues(
+                                  alpha: 0.2,
+                                ),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -379,7 +408,7 @@ class _ProductCard extends StatelessWidget {
                               ? Image.network(
                                   item.baseImageUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Center(
+                                  errorBuilder: (context, error, stackTrace) => Center(
                                     child: Icon(
                                       Icons.image_not_supported_outlined,
                                       size: 48,
@@ -405,7 +434,7 @@ class _ProductCard extends StatelessWidget {
                                     end: Alignment.bottomCenter,
                                     colors: [
                                       Colors.transparent,
-                                      Colors.black.withOpacity(0.4),
+                                      Colors.black.withValues(alpha: 0.4),
                                     ],
                                   ),
                                 ),
@@ -416,7 +445,9 @@ class _ProductCard extends StatelessWidget {
                                     child: Container(
                                       padding: const EdgeInsets.all(6),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.95),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.95,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Icon(
@@ -438,7 +469,7 @@ class _ProductCard extends StatelessWidget {
                   Positioned(
                     top: 5,
                     right: 5,
-                    child: _WishlistIcon(productId: item.numericId),
+                    child: _WishlistIcon(productId: item.productNumericId),
                   ),
                 ],
               ),
@@ -455,7 +486,9 @@ class _ProductCard extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (_) => ProductDetailPage(
                           urlKey: item.urlKey!,
+                          productId: item.productNumericId.toString(),
                           productName: item.productName,
+                          productType: item.type,
                         ),
                       ),
                     );
@@ -555,6 +588,8 @@ class _ProductCard extends StatelessWidget {
   }
 
   Widget _buildActionRow(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return BlocBuilder<CompareBloc, CompareState>(
       builder: (context, state) {
         final isProcessing = state.processingIds.contains(item.id);
@@ -566,7 +601,7 @@ class _ProductCard extends StatelessWidget {
               child: BlocBuilder<CartBloc, CartState>(
                 builder: (context, cartState) {
                   final isAddingToCart = cartState.isAddingToCart;
-                  
+
                   return SizedBox(
                     height: 36,
                     child: ElevatedButton(
@@ -593,8 +628,8 @@ class _ProductCard extends StatelessWidget {
                                 ),
                               ),
                             )
-                          : const Text(
-                              'Add to Cart',
+                          : Text(
+                              l10n.productAddToCart,
                               style: TextStyle(
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w700,
@@ -623,9 +658,9 @@ class _ProductCard extends StatelessWidget {
               InkWell(
                 borderRadius: BorderRadius.circular(54),
                 onTap: () {
-                  context
-                      .read<CompareBloc>()
-                      .add(RemoveCompareItem(id: item.id));
+                  context.read<CompareBloc>().add(
+                    RemoveCompareItem(id: item.id),
+                  );
                 },
                 child: Padding(
                   padding: const EdgeInsets.all(4),
@@ -643,12 +678,40 @@ class _ProductCard extends StatelessWidget {
   }
 
   void _addProductToCart(BuildContext context) {
-    context.read<CartBloc>().add(
-          AddToCart(
-            productId: item.numericId,
-            quantity: 1,
+    if (_requiresProductDetails) {
+      if (item.urlKey == null || item.urlKey!.isEmpty) return;
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProductDetailPage(
+            urlKey: item.urlKey!,
+            productId: item.productNumericId.toString(),
+            productName: item.productName,
+            productType: item.type,
           ),
-        );
+        ),
+      );
+      return;
+    }
+
+    if (item.productNumericId <= 0) return;
+
+    context.read<CartBloc>().add(
+      AddToCart(productId: item.productNumericId, quantity: 1),
+    );
+  }
+
+  bool get _requiresProductDetails {
+    switch ((item.type ?? '').toLowerCase()) {
+      case 'configurable':
+      case 'bundle':
+      case 'grouped':
+      case 'downloadable':
+      case 'booking':
+        return true;
+      default:
+        return false;
+    }
   }
 }
 
@@ -664,6 +727,7 @@ class _ValueCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     String value;
     bool isBold = false;
@@ -672,28 +736,30 @@ class _ValueCell extends StatelessWidget {
       case _AttrType.productCard:
         return const SizedBox.shrink(); // handled by _ProductCard
       case _AttrType.sku:
-        value = item.sku ?? 'N/A';
+        value = item.sku ?? l10n.accountNotAvailable;
         isBold = true;
         break;
       case _AttrType.description:
-        value = _getDescription();
+        value = _getDescription(l10n);
         break;
       case _AttrType.shortDescription:
         value = item.shortDescription?.isNotEmpty == true
             ? _stripHtml(item.shortDescription!)
-            : 'N/A';
+            : l10n.accountNotAvailable;
         break;
       case _AttrType.activity:
-        value = item.attributes['Activity'] ??
+        value =
+            item.attributes['Activity'] ??
             item.attributes['activity'] ??
-            'N/A';
+            l10n.accountNotAvailable;
         break;
       case _AttrType.seller:
-        value = item.attributes['Seller'] ??
+        value =
+            item.attributes['Seller'] ??
             item.attributes['seller'] ??
             item.attributes['Brand'] ??
             item.attributes['brand'] ??
-            'N/A';
+            l10n.accountNotAvailable;
         break;
     }
 
@@ -729,9 +795,9 @@ class _ValueCell extends StatelessWidget {
     );
   }
 
-  String _getDescription() {
+  String _getDescription(AppLocalizations l10n) {
     final desc = item.description;
-    if (desc == null || desc.isEmpty) return 'N/A';
+    if (desc == null || desc.isEmpty) return l10n.accountNotAvailable;
     return _stripHtml(desc);
   }
 
@@ -764,7 +830,7 @@ class _ValueCell extends StatelessWidget {
 
 class _WishlistIcon extends StatelessWidget {
   final int productId;
-  
+
   const _WishlistIcon({required this.productId});
 
   @override
@@ -781,9 +847,39 @@ class _WishlistIcon extends StatelessWidget {
                 ? null
                 : () async {
                     try {
-                      await context.read<WishlistCubit>().toggleWishlist(
-                            productId: productId,
-                          );
+                      final result = await context.read<WishlistCubit>().toggleWishlist(
+                        productId: productId,
+                      );
+                      if (!context.mounted) return;
+
+                      final l10n = AppLocalizations.of(context)!;
+                      final messenger = ScaffoldMessenger.of(context);
+                      messenger.hideCurrentSnackBar();
+
+                      if (result == null) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.categoryLoginToManageWishlist),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                        return;
+                      }
+
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result
+                                ? l10n.categoryAddedToWishlist
+                                : l10n.categoryRemovedFromWishlist,
+                          ),
+                          backgroundColor: AppColors.successGreen,
+                          behavior: SnackBarBehavior.floating,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context)
@@ -791,7 +887,11 @@ class _WishlistIcon extends StatelessWidget {
                           ..showSnackBar(
                             SnackBar(
                               content: Text(
-                                  'Error updating wishlist: ${e.toString()}'),
+                                ErrorMapper.getUserMessage(
+                                  e,
+                                  context: 'updating wishlist',
+                                ),
+                              ),
                               backgroundColor: Colors.red,
                               behavior: SnackBarBehavior.floating,
                               duration: const Duration(seconds: 2),
@@ -809,8 +909,9 @@ class _WishlistIcon extends StatelessWidget {
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(AppColors.white),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.white,
+                        ),
                       ),
                     )
                   : Icon(
@@ -821,8 +922,8 @@ class _WishlistIcon extends StatelessWidget {
                       color: isWishlisted
                           ? Colors.red
                           : (Theme.of(context).brightness == Brightness.dark
-                              ? AppColors.neutral300
-                              : AppColors.neutral500),
+                                ? AppColors.neutral300
+                                : AppColors.neutral500),
                     ),
             ),
           ),
@@ -830,4 +931,5 @@ class _WishlistIcon extends StatelessWidget {
       },
     );
   }
+
 }

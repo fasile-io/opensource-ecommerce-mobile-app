@@ -1,7 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/graphql/account_queries.dart';
 import '../models/account_models.dart';
+
+void _logAccountApiMessage(String message) {
+  debugPrint(message);
+  // ignore: avoid_print
+  print(message);
+}
 
 /// Repository for Account Dashboard API calls via GraphQL.
 /// Uses authenticated GraphQL client to fetch:
@@ -16,6 +23,64 @@ class AccountRepository {
   final GraphQLClient client;
 
   AccountRepository({required this.client});
+
+  Future<List<ShopLocale>> getLocales() async {
+    _logAccountApiMessage('🌐 AccountRepo.getLocales called');
+    _logAccountApiMessage('📝 Query Name: getLocales');
+
+    final result = await client.query(
+      QueryOptions(
+        document: gql(AccountQueries.getLocales),
+        fetchPolicy: FetchPolicy.networkOnly,
+      ),
+    );
+
+    if (result.hasException) {
+      final message = _extractErrorMessage(result.exception!);
+      _logAccountApiMessage('❌ AccountRepo.getLocales error: $message');
+      throw AccountException(message);
+    }
+
+    final edges = result.data?['locales']?['edges'] as List<dynamic>? ?? [];
+    final locales = edges
+        .map((edge) => ShopLocale.fromJson(edge['node'] as Map<String, dynamic>))
+        .toList();
+
+    _logAccountApiMessage(
+      '✅ AccountRepo.getLocales success: ${locales.length} locales',
+    );
+    return locales;
+  }
+
+  Future<List<ShopCurrency>> getCurrencies() async {
+    _logAccountApiMessage('🌐 AccountRepo.getCurrencies called');
+    _logAccountApiMessage('📝 Query Name: allCurrency');
+
+    final result = await client.query(
+      QueryOptions(
+        document: gql(AccountQueries.getCurrencies),
+        fetchPolicy: FetchPolicy.networkOnly,
+      ),
+    );
+
+    if (result.hasException) {
+      final message = _extractErrorMessage(result.exception!);
+      _logAccountApiMessage('❌ AccountRepo.getCurrencies error: $message');
+      throw AccountException(message);
+    }
+
+    final edges = result.data?['currencies']?['edges'] as List<dynamic>? ?? [];
+    final currencies = edges
+        .map(
+          (edge) => ShopCurrency.fromJson(edge['node'] as Map<String, dynamic>),
+        )
+        .toList();
+
+    _logAccountApiMessage(
+      '✅ AccountRepo.getCurrencies success: ${currencies.length} currencies',
+    );
+    return currencies;
+  }
 
   /// Fetch customer profile via readCustomerProfile query.
   /// The API uses the auth token to identify the user (id is empty string).
@@ -391,7 +456,8 @@ class AccountRepository {
       throw AccountException(message);
     }
 
-    final data = result.data?['createAddUpdateCustomerAddress']?['addUpdateCustomerAddress'];
+    final data = result
+        .data?['createAddUpdateCustomerAddress']?['addUpdateCustomerAddress'];
     if (data == null) {
       throw AccountException('Failed to set default address');
     }
@@ -1190,15 +1256,7 @@ class AccountRepository {
 
   /// Extract error message from GraphQL exception
   String _extractErrorMessage(OperationException exception) {
-    if (exception.graphqlErrors.isNotEmpty) {
-      return exception.graphqlErrors.first.message;
-    }
-    if (exception.linkException != null) {
-      final linkEx = exception.linkException;
-      debugPrint('🔗 AccountRepo — linkException: ${linkEx.toString()}');
-      return 'Network error: ${linkEx.toString()}';
-    }
-    return 'Something went wrong. Please try again.';
+    return ErrorMapper.getUserMessage(exception);
   }
 
   /// Reorder an existing order.
@@ -1270,7 +1328,9 @@ class AccountRepository {
 
     if (result.hasException) {
       final message = _extractErrorMessage(result.exception!);
-      debugPrint('📥 AccountRepo.getCustomerDownloadableProducts — error: $message');
+      debugPrint(
+        '📥 AccountRepo.getCustomerDownloadableProducts — error: $message',
+      );
       throw AccountException(message);
     }
 
@@ -1286,7 +1346,10 @@ class AccountRepository {
 
     final edges = data['edges'] as List<dynamic>? ?? [];
     final products = edges
-        .map((e) => DownloadableProduct.fromJson(e['node'] as Map<String, dynamic>))
+        .map(
+          (e) =>
+              DownloadableProduct.fromJson(e['node'] as Map<String, dynamic>),
+        )
         .toList();
     final totalCount = data['totalCount'] as int? ?? products.length;
     final pageInfo = data['pageInfo'] as Map<String, dynamic>?;

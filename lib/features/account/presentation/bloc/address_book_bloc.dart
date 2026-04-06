@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 
@@ -63,19 +64,20 @@ class SetDefaultAddress extends AddressBookEvent {
 
   @override
   List<Object?> get props => [
-        addressId,
-        firstName,
-        lastName,
-        address,
-        city,
-        state,
-        country,
-        postcode,
-        phone,
-        email,
-        useForShipping,
-      ];
+    addressId,
+    firstName,
+    lastName,
+    address,
+    city,
+    state,
+    country,
+    postcode,
+    phone,
+    email,
+    useForShipping,
+  ];
 }
+
 /// Delete an address
 class DeleteAddress extends AddressBookEvent {
   final String addressId;
@@ -297,7 +299,7 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
       emit(
         state.copyWith(
           status: AddressBookStatus.error,
-          errorMessage: e is AccountException ? e.message : e.toString(),
+          errorMessage: ErrorMapper.getUserMessage(e),
         ),
       );
     }
@@ -326,7 +328,10 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
 
       // Optimistic update using model's copyWith — future-proof
       final updatedAddresses = state.addresses
-          .map((addr) => addr.copyWith(isDefault: addr.numericId == event.addressId))
+          .map(
+            (addr) =>
+                addr.copyWith(isDefault: addr.numericId == event.addressId),
+          )
           .toList();
 
       emit(
@@ -343,9 +348,10 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
       emit(
         state.copyWith(
           isPerformingAction: false,
-          actionMessage: e is AccountException
-              ? e.message
-              : 'Failed to update address',
+          actionMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'updating address',
+          ),
         ),
       );
     }
@@ -382,9 +388,10 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
       emit(
         state.copyWith(
           isPerformingAction: false,
-          actionMessage: e is AccountException
-              ? e.message
-              : 'Failed to delete address',
+          actionMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'deleting address',
+          ),
         ),
       );
     }
@@ -433,9 +440,10 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
       emit(
         state.copyWith(
           isPerformingAction: false,
-          actionMessage: e is AccountException
-              ? e.message
-              : 'Failed to add address',
+          actionMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'adding address',
+          ),
         ),
       );
     }
@@ -491,9 +499,10 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
       emit(
         state.copyWith(
           isPerformingAction: false,
-          actionMessage: e is AccountException
-              ? e.message
-              : 'Failed to update address',
+          actionMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'updating address',
+          ),
         ),
       );
     }

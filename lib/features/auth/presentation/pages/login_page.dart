@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../bloc/auth_bloc.dart';
-import '../widgets/social_login_icons.dart';
 import 'forgot_password_page.dart';
 import 'sign_up_page.dart';
 import '../../../../core/widgets/app_back_button.dart';
-import '../../../account/presentation/pages/preferences_bottom_sheet.dart';
 
 /// Login page for existing customers
 /// Figma: authentication flow — login screen
@@ -31,8 +30,8 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'pauldoe@example.com');
-  final _passwordController = TextEditingController(text: 'admin123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
@@ -56,6 +55,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -80,8 +80,8 @@ class _LoginPageState extends State<LoginPage> {
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Welcome! Successfully logged in.'),
+              SnackBar(
+                content: Text(l10n.authLoginSuccess),
                 backgroundColor: Color(0xFF00A63E),
               ),
             );
@@ -113,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
 
                   // ── Heading ──
                   Text(
-                    'Welcome back!',
+                    l10n.authWelcomeBack,
                     style: AppTextStyles.text2(context),
                     textAlign: TextAlign.center,
                   ),
@@ -121,7 +121,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 8),
 
                   Text(
-                    'Login to your account',
+                    l10n.authLoginToAccount,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
@@ -139,18 +139,20 @@ class _LoginPageState extends State<LoginPage> {
                   // ── Email Field ──
                   _buildTextField(
                     controller: _emailController,
-                    label: 'Email Address',
-                    hintText: 'Enter your email',
+                    fieldKey: const Key('login_email_field'),
+                    semanticsIdentifier: 'login_email_field',
+                    label: l10n.authEmailAddress,
+                    hintText: l10n.authEnterYourEmail,
                     keyboardType: TextInputType.emailAddress,
                     isDark: isDark,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return l10n.authPleaseEnterEmail;
                       }
                       if (!RegExp(
                         r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
                       ).hasMatch(value)) {
-                        return 'Please enter a valid email';
+                        return l10n.authPleaseEnterValidEmail;
                       }
                       return null;
                     },
@@ -161,8 +163,10 @@ class _LoginPageState extends State<LoginPage> {
                   // ── Password Field ──
                   _buildTextField(
                     controller: _passwordController,
-                    label: 'Password',
-                    hintText: 'Enter your password',
+                    fieldKey: const Key('login_password_field'),
+                    semanticsIdentifier: 'login_password_field',
+                    label: l10n.authPassword,
+                    hintText: l10n.authEnterYourPassword,
                     isDark: isDark,
                     obscureText: _obscurePassword,
                     suffixIcon: IconButton(
@@ -181,10 +185,10 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
+                        return l10n.authPleaseEnterPassword;
                       }
                       if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return l10n.authPasswordMinLength;
                       }
                       return null;
                     },
@@ -209,8 +213,8 @@ class _LoginPageState extends State<LoginPage> {
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text(
-                        'Forgot Password?',
+                      child: Text(
+                        l10n.authForgotPasswordTitle,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w500,
@@ -229,36 +233,41 @@ class _LoginPageState extends State<LoginPage> {
                       final isLoading = state is AuthLoading;
                       return SizedBox(
                         height: 50,
-                        child: ElevatedButton(
-                          onPressed: isLoading ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary500,
-                            foregroundColor: AppColors.white,
-                            disabledBackgroundColor: AppColors.primary500
-                                .withValues(alpha: 0.6),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(54),
+                        child: Semantics(
+                          identifier: 'login_submit_button',
+                          button: true,
+                          child: ElevatedButton(
+                            key: const Key('login_submit_button'),
+                            onPressed: isLoading ? null : _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary500,
+                              foregroundColor: AppColors.white,
+                              disabledBackgroundColor: AppColors.primary500
+                                  .withValues(alpha: 0.6),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(54),
+                              ),
+                              textStyle: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                height: 1.17,
+                              ),
                             ),
-                            textStyle: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              height: 1.17,
-                            ),
-                          ),
-                          child: isLoading
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      AppColors.white,
+                            child: isLoading
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        AppColors.white,
+                                      ),
                                     ),
-                                  ),
-                                )
-                              : const Text('Login'),
+                                  )
+                                : Text(l10n.authLogin),
+                          ),
                         ),
                       );
                     },
@@ -313,7 +322,7 @@ class _LoginPageState extends State<LoginPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Don't have an account? ",
+                        l10n.authNoAccountPrompt,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w400,
@@ -332,8 +341,8 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           );
                         },
-                        child: const Text(
-                          'Sign Up',
+                        child: Text(
+                          l10n.authSignUp,
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w700,
@@ -368,6 +377,8 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildTextField({
     required TextEditingController controller,
+    required Key fieldKey,
+    required String semanticsIdentifier,
     required String label,
     required String hintText,
     required bool isDark,
@@ -390,52 +401,57 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
         const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          obscureText: obscureText,
-          validator: validator,
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 14,
-            color: isDark ? AppColors.neutral200 : AppColors.neutral900,
-          ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: TextStyle(
+        Semantics(
+          identifier: semanticsIdentifier,
+          textField: true,
+          child: TextFormField(
+            key: fieldKey,
+            controller: controller,
+            keyboardType: keyboardType,
+            obscureText: obscureText,
+            validator: validator,
+            style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
-              color: isDark ? AppColors.neutral500 : AppColors.neutral400,
+              color: isDark ? AppColors.neutral200 : AppColors.neutral900,
             ),
-            suffixIcon: suffixIcon,
-            filled: true,
-            fillColor: isDark ? AppColors.neutral800 : AppColors.neutral50,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+            decoration: InputDecoration(
+              hintText: hintText,
+              hintStyle: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 14,
+                color: isDark ? AppColors.neutral500 : AppColors.neutral400,
               ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+              suffixIcon: suffixIcon,
+              filled: true,
+              fillColor: isDark ? AppColors.neutral800 : AppColors.neutral50,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
               ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primary500,
-                width: 1.5,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+                ),
               ),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: AppColors.primary500,
+                  width: 1.5,
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.red),
+              ),
             ),
           ),
         ),

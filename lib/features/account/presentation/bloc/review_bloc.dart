@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 
@@ -150,7 +151,13 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
     } catch (e) {
       debugPrint('❌ ReviewBloc._onLoad error: $e');
       emit(
-        state.copyWith(status: ReviewStatus.error, errorMessage: e.toString()),
+        state.copyWith(
+          status: ReviewStatus.error,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading reviews',
+          ),
+        ),
       );
     }
   }
@@ -182,7 +189,15 @@ class ReviewBloc extends Bloc<ReviewEvent, ReviewState> {
       );
     } catch (e) {
       debugPrint('❌ ReviewBloc._onLoadMore error: $e');
-      emit(state.copyWith(isLoadingMore: false, errorMessage: e.toString()));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading more reviews',
+          ),
+        ),
+      );
     }
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/category_model.dart';
 import '../../data/models/product_model.dart';
 import '../../data/repository/category_repository.dart';
@@ -97,16 +98,16 @@ class CategoryState extends Equatable {
 
   @override
   List<Object?> get props => [
-        status,
-        categories,
-        subCategories,
-        selectedCategory,
-        products,
-        pageInfo,
-        totalProducts,
-        isLoadingMore,
-        errorMessage,
-      ];
+    status,
+    categories,
+    subCategories,
+    selectedCategory,
+    products,
+    pageInfo,
+    totalProducts,
+    isLoadingMore,
+    errorMessage,
+  ];
 }
 
 // ─── BLoC ──────────────────────────────────────────────────────────────────
@@ -166,32 +167,36 @@ class CategoryBloc extends Bloc<CategoryEvent, CategoryState> {
           }
         }
 
-        emit(state.copyWith(
-          status: CategoryStatus.loaded,
-          categories: categories,
-          selectedCategory: selected,
-          subCategories: subCats,
-          products: products,
-          pageInfo: pageInfo,
-          totalProducts: totalProducts,
-        ));
+        emit(
+          state.copyWith(
+            status: CategoryStatus.loaded,
+            categories: categories,
+            selectedCategory: selected,
+            subCategories: subCats,
+            products: products,
+            pageInfo: pageInfo,
+            totalProducts: totalProducts,
+          ),
+        );
         return; // success — exit retry loop
       } catch (e) {
-        final isNetworkError = e.toString().contains('Network') ||
-            e.toString().contains('TimeoutException') ||
-            e.toString().contains('No stream event') ||
-            e.toString().contains('SocketException') ||
-            e.toString().contains('linkException');
-        if (isNetworkError && attempt < maxAttempts) {
-          debugPrint('[CategoryBloc] LoadCategories network error (attempt $attempt/$maxAttempts, retrying): $e');
+        if (ErrorMapper.isNetworkError(e) && attempt < maxAttempts) {
+          debugPrint(
+            '[CategoryBloc] LoadCategories network error (attempt $attempt/$maxAttempts, retrying): $e',
+          );
           await Future.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         }
         debugPrint('[CategoryBloc] LoadCategories failed: $e');
-        emit(state.copyWith(
-          status: CategoryStatus.error,
-          errorMessage: e.toString(),
-        ));
+        emit(
+          state.copyWith(
+            status: CategoryStatus.error,
+            errorMessage: ErrorMapper.getUserMessage(
+              e,
+              context: 'loading categories',
+            ),
+          ),
+        );
       }
     }
   }
@@ -200,12 +205,14 @@ class CategoryBloc extends Bloc<CategoryEvent, CategoryState> {
     SelectCategory event,
     Emitter<CategoryState> emit,
   ) async {
-    emit(state.copyWith(
-      selectedCategory: event.category,
-      subCategories: [],
-      products: [],
-      isLoadingMore: false,
-    ));
+    emit(
+      state.copyWith(
+        selectedCategory: event.category,
+        subCategories: [],
+        products: [],
+        isLoadingMore: false,
+      ),
+    );
 
     try {
       // Children are already in the tree category model
@@ -221,16 +228,23 @@ class CategoryBloc extends Bloc<CategoryEvent, CategoryState> {
         );
       }
 
-      emit(state.copyWith(
-        subCategories: subCats,
-        products: result?.products ?? [],
-        pageInfo: result?.pageInfo,
-        totalProducts: result?.totalCount ?? 0,
-      ));
+      emit(
+        state.copyWith(
+          subCategories: subCats,
+          products: result?.products ?? [],
+          pageInfo: result?.pageInfo,
+          totalProducts: result?.totalCount ?? 0,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading category products',
+          ),
+        ),
+      );
     }
   }
 
@@ -244,7 +258,14 @@ class CategoryBloc extends Bloc<CategoryEvent, CategoryState> {
       );
       emit(state.copyWith(subCategories: subCats));
     } catch (e) {
-      emit(state.copyWith(errorMessage: e.toString()));
+      emit(
+        state.copyWith(
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading subcategories',
+          ),
+        ),
+      );
     }
   }
 
@@ -259,13 +280,22 @@ class CategoryBloc extends Bloc<CategoryEvent, CategoryState> {
         after: event.after,
       );
 
-      emit(state.copyWith(
-        products: result.products,
-        pageInfo: result.pageInfo,
-        totalProducts: result.totalCount,
-      ));
+      emit(
+        state.copyWith(
+          products: result.products,
+          pageInfo: result.pageInfo,
+          totalProducts: result.totalCount,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(errorMessage: e.toString()));
+      emit(
+        state.copyWith(
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading products',
+          ),
+        ),
+      );
     }
   }
 
@@ -294,17 +324,24 @@ class CategoryBloc extends Bloc<CategoryEvent, CategoryState> {
         after: state.pageInfo!.endCursor,
       );
 
-      emit(state.copyWith(
-        products: [...state.products, ...result.products],
-        pageInfo: result.pageInfo,
-        totalProducts: result.totalCount,
-        isLoadingMore: false,
-      ));
+      emit(
+        state.copyWith(
+          products: [...state.products, ...result.products],
+          pageInfo: result.pageInfo,
+          totalProducts: result.totalCount,
+          isLoadingMore: false,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading more products',
+          ),
+        ),
+      );
     }
   }
 }

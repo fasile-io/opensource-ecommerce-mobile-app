@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 import '../bloc/orders_bloc.dart';
@@ -17,6 +18,8 @@ class RecentOrdersSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.only(top: 24),
       child: Column(
@@ -25,7 +28,7 @@ class RecentOrdersSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: SectionHeader(
-              title: 'Recent Orders',
+              title: l10n.accountRecentOrders,
               onViewAll: orders.isNotEmpty
                   ? () {
                       final repository = context.read<AccountRepository>();
@@ -91,6 +94,7 @@ class RecentOrdersSection extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Container(
@@ -105,7 +109,7 @@ class RecentOrdersSection extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            'No recent orders',
+            l10n.accountNoRecentOrders,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
@@ -119,6 +123,7 @@ class RecentOrdersSection extends StatelessWidget {
 
   Widget _buildOrderCard(BuildContext context, RecentOrder order) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       width: 270,
@@ -153,7 +158,7 @@ class RecentOrdersSection extends StatelessWidget {
                 // Status chip + date
                 Row(
                   children: [
-                    _buildStatusChip(order.status),
+                    _buildStatusChip(context, order.status),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -174,7 +179,7 @@ class RecentOrdersSection extends StatelessWidget {
                 const SizedBox(height: 5),
                 // Total + item count
                 Text(
-                  '${order.formattedTotal} (Items ${order.itemCount})',
+                  l10n.accountOrderTotalItems(order.formattedTotal, order.itemCount),
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w400,
@@ -191,7 +196,8 @@ class RecentOrdersSection extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(BuildContext context, String status) {
+    final l10n = AppLocalizations.of(context)!;
     Color bgColor;
     Color borderColor;
     Color textColor;
@@ -202,32 +208,32 @@ class RecentOrdersSection extends StatelessWidget {
         bgColor = const Color(0xFFDBEAFE);
         borderColor = const Color(0xFFBEDBFF);
         textColor = const Color(0xFF2B7FFF);
-        label = 'Processing';
+        label = l10n.accountStatusProcessing;
         break;
       case 'completed':
         bgColor = const Color(0xFFDCFCE7);
         borderColor = const Color(0xFFB9F8CF);
         textColor = const Color(0xFF00A63E);
-        label = 'Completed';
+        label = l10n.accountStatusCompleted;
         break;
       case 'pending':
         bgColor = const Color(0xFFFEF3C7);
         borderColor = const Color(0xFFFDE68A);
         textColor = const Color(0xFFD97706);
-        label = 'Pending';
+        label = l10n.accountStatusPending;
         break;
       case 'canceled':
       case 'cancelled':
         bgColor = const Color(0xFFFEE2E2);
         borderColor = const Color(0xFFFECACA);
         textColor = const Color(0xFFDC2626);
-        label = 'Cancelled';
+        label = l10n.accountStatusCancelled;
         break;
       case 'closed':
         bgColor = const Color(0xFFF3F4F6);
         borderColor = const Color(0xFFE5E7EB);
         textColor = const Color(0xFF6B7280);
-        label = 'Closed';
+        label = l10n.accountStatusClosed;
         break;
       default:
         bgColor = const Color(0xFFDBEAFE);
@@ -235,7 +241,7 @@ class RecentOrdersSection extends StatelessWidget {
         textColor = const Color(0xFF2B7FFF);
         label = status.isNotEmpty
             ? '${status[0].toUpperCase()}${status.substring(1)}'
-            : 'Unknown';
+            : l10n.accountStatusUnknown;
     }
 
     return Container(

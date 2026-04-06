@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -61,6 +64,9 @@ dependencies:
   url_launcher: ^6.2.0
   flutter_inappwebview: ^6.1.5
   speech_to_text: ^7.0.0
+  open_filex: ^4.6.0
+  device_info_plus: ^11.1.0
+  dio: ^5.4.1
 
   # Image Handling & Camera
   image_picker: ^1.0.7
@@ -69,13 +75,25 @@ dependencies:
   permission_handler: ^11.0.0
 
   # On-device ML Kit for real object detection
-  google_mlkit_image_labeling: ^0.12.0
-  google_mlkit_object_detection: ^0.13.0
+  google_mlkit_image_labeling: ^0.14.0
+  google_mlkit_object_detection: ^0.15.0
 
   # Image Processing
   http: ^1.1.0
   flutter_image_compress: ^2.3.0
   path_provider: ^2.1.0
+
+  # Firebase & Push Notifications
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.0
+  flutter_local_notifications: ^17.2.1
+
+  # App Version Update
+  upgrader: ^11.3.0
+  package_info_plus: ^8.1.0
+
+  # Image Zoom & Fullscreen
+  photo_view: ^0.15.0
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +113,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

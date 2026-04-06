@@ -34,7 +34,7 @@ class AppColors {
 
 ### 3. Color Categories Available
 
-The app provides different color categories:
+The app defines several color categories:
 
 | Category | Description |
 |----------|-------------|

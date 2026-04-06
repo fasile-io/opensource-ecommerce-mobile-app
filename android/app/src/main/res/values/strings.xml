@@ -12,8 +12,6 @@
 <resources>
 <!--    <string name="app_name">Bagisto Laravel App</string>-->
 
-    <string name="maps_api_key" translatable="false">AIzaSyBAlqVDV_6ec8DKG3yJPAE29HV4f-GOsdk</string>
-
     <string name="results_found"> Results Found</string>
     <string name="x_results_found">%d Results Found</string>
     <string name="error_while_using_flash">There has been some error while accessing flash on your device.</string>

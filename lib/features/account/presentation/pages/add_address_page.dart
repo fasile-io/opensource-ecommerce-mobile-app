@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/selection_sheet.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 import '../bloc/address_book_bloc.dart';
@@ -79,8 +81,12 @@ class _AddAddressPageState extends State<AddAddressPage> {
   @override
   void initState() {
     super.initState();
-    _loadCountries();
     _prepopulateIfEditing();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadCountries();
+      }
+    });
   }
 
   /// Pre-fill form fields when editing an existing address.
@@ -143,13 +149,14 @@ class _AddAddressPageState extends State<AddAddressPage> {
       // If no countries loaded, show error
       if (_countries.isEmpty) {
         if (mounted) {
+          final l10n = AppLocalizations.of(context)!;
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(
-              const SnackBar(
-                content: Text('No countries available. Please try again.'),
+              SnackBar(
+                content: Text(l10n.accountNoCountriesAvailable),
                 behavior: SnackBarBehavior.floating,
-                duration: Duration(seconds: 3),
+                duration: const Duration(seconds: 3),
               ),
             );
         }
@@ -195,7 +202,9 @@ class _AddAddressPageState extends State<AddAddressPage> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text('Failed to load countries: ${e.toString()}'),
+            content: Text(
+              ErrorMapper.getUserMessage(e, context: 'loading countries'),
+            ),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 3),
           ),
@@ -223,9 +232,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
 
       // Show warning if no states available for this country
       if (_states.isEmpty) {
-        debugPrint(
-          '⚠️  No states available for country: ${country.name}',
-        );
+        debugPrint('⚠️  No states available for country: ${country.name}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -238,7 +245,9 @@ class _AddAddressPageState extends State<AddAddressPage> {
         ..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text('Failed to load states: ${e.toString()}'),
+            content: Text(
+              ErrorMapper.getUserMessage(e, context: 'loading states'),
+            ),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 3),
           ),
@@ -247,13 +256,15 @@ class _AddAddressPageState extends State<AddAddressPage> {
   }
 
   Future<void> _onCountryTap() async {
+    final l10n = AppLocalizations.of(context)!;
+
     if (_loadingCountries || _countries.isEmpty) return;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final selected = await SelectionSheet.show<Country>(
       context: context,
-      title: 'Select Country',
+      title: l10n.checkoutSelectCountry,
       items: _countries,
       selectedItem: _selectedCountry,
       itemLabel: (c) => c.name,
@@ -278,6 +289,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
   }
 
   Future<void> _onStateTap() async {
+    final l10n = AppLocalizations.of(context)!;
+
     if (_loadingStates) return;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -290,7 +303,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
 
     final selected = await SelectionSheet.show<CountryState>(
       context: context,
-      title: 'Select State',
+      title: l10n.checkoutSelectState,
       items: _states,
       selectedItem: _selectedState,
       itemLabel: (s) => s.name,
@@ -328,6 +341,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
   }
 
   void _onSubmit() {
+    final l10n = AppLocalizations.of(context)!;
+
     if (!_formKey.currentState!.validate()) return;
 
     // Validate country
@@ -335,8 +350,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Please select a country'),
+          SnackBar(
+            content: Text(l10n.accountPleaseSelectCountry),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -348,8 +363,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          const SnackBar(
-            content: Text('Please select or enter a state'),
+          SnackBar(
+            content: Text(l10n.accountPleaseSelectOrEnterState),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -395,6 +410,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return BlocListener<AddressBookBloc, AddressBookState>(
       listenWhen: (prev, curr) =>
@@ -416,8 +432,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
               SnackBar(
                 content: Text(
                   state.addressUpdated
-                      ? 'Address updated successfully'
-                      : 'Address added successfully',
+                      ? l10n.accountAddressUpdatedSuccessfully
+                      : l10n.accountAddressAddedSuccessfully,
                 ),
                 behavior: SnackBarBehavior.floating,
                 duration: const Duration(seconds: 2),
@@ -462,6 +478,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
 
   /// Nav bar — back arrow + "Add New Address"
   Widget _buildNavBar(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: isDark ? AppColors.neutral900 : AppColors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -470,7 +488,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
         children: [
           Semantics(
             button: true,
-            label: 'Go back',
+            label: l10n.accountGoBack,
             child: Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(10),
@@ -478,7 +496,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
                 onTap: () => Navigator.of(context).pop(),
                 borderRadius: BorderRadius.circular(10),
                 child: Tooltip(
-                  message: 'Back',
+                  message: l10n.accountBack,
                   child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: Icon(
@@ -497,7 +515,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                _isEditing ? 'Edit Address' : 'Add New Address',
+                _isEditing ? l10n.accountEditAddress : l10n.accountAddNewAddress,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -515,6 +533,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
 
   /// Scrollable form — all fields matching Figma layout
   Widget _buildForm(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Form(
@@ -528,14 +548,14 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _firstNameCtrl,
-                label: 'First Name',
+                label: l10n.checkoutFirstName,
                 isRequired: true,
                 textInputAction: TextInputAction.next,
                 onFieldSubmitted: (_) =>
                     FocusScope.of(context).requestFocus(_lastNameFocus),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'First name is required';
+                    return l10n.accountFirstNameRequired;
                   }
                   return null;
                 },
@@ -546,7 +566,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _lastNameCtrl,
-                label: 'Last Name',
+                label: l10n.checkoutLastName,
                 isRequired: true,
                 focusNode: _lastNameFocus,
                 textInputAction: TextInputAction.next,
@@ -554,7 +574,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
                     FocusScope.of(context).requestFocus(_emailFocus),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Last name is required';
+                    return l10n.accountLastNameRequired;
                   }
                   return null;
                 },
@@ -565,7 +585,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _emailCtrl,
-                label: 'Email',
+                label: l10n.checkoutEmail,
                 focusNode: _emailFocus,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
@@ -575,7 +595,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
                   if (v != null && v.isNotEmpty) {
                     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
                     if (!emailRegex.hasMatch(v.trim())) {
-                      return 'Enter a valid email';
+                      return l10n.accountEnterValidEmail;
                     }
                   }
                   return null;
@@ -587,7 +607,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _companyCtrl,
-                label: 'Company Name',
+                label: l10n.accountCompanyName,
                 focusNode: _companyFocus,
                 textInputAction: TextInputAction.next,
                 onFieldSubmitted: (_) =>
@@ -599,7 +619,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _vatIdCtrl,
-                label: 'VAT id',
+                label: l10n.accountVatId,
                 focusNode: _vatIdFocus,
                 textInputAction: TextInputAction.next,
                 onFieldSubmitted: (_) =>
@@ -611,13 +631,13 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _streetCtrl,
-                label: 'Street Address',
+                label: l10n.checkoutStreetAddress,
                 isRequired: true,
                 focusNode: _streetFocus,
                 textInputAction: TextInputAction.next,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Street address is required';
+                    return l10n.accountStreetAddressRequired;
                   }
                   return null;
                 },
@@ -631,14 +651,14 @@ class _AddAddressPageState extends State<AddAddressPage> {
                 children: [
                   AddressFormField(
                     controller: _countryDisplayCtrl,
-                    label: 'Country',
+                    label: l10n.checkoutCountry,
                     isRequired: true,
                     isDropdown: true,
                     onDropdownTap: _onCountryTap,
                     enabled: !_loadingCountries,
                     validator: (v) {
                       if (_selectedCountry == null) {
-                        return 'Please select a country';
+                        return l10n.accountPleaseSelectCountry;
                       }
                       return null;
                     },
@@ -666,15 +686,14 @@ class _AddAddressPageState extends State<AddAddressPage> {
                 children: [
                   AddressFormField(
                     controller: _stateDisplayCtrl,
-                    label: 'State',
+                    label: l10n.checkoutState,
                     isRequired: true,
                     isDropdown: true,
-                    onDropdownTap:
-                        _loadingStates ? null : _onStateTap,
+                    onDropdownTap: _loadingStates ? null : _onStateTap,
                     enabled: _selectedCountry != null && !_loadingStates,
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) {
-                        return 'State is required';
+                        return l10n.checkoutStateRequired;
                       }
                       return null;
                     },
@@ -699,7 +718,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _cityCtrl,
-                label: 'City',
+                label: l10n.checkoutCity,
                 isRequired: true,
                 focusNode: _cityFocus,
                 textInputAction: TextInputAction.next,
@@ -707,7 +726,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
                     FocusScope.of(context).requestFocus(_postcodeFocus),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'City is required';
+                    return l10n.accountCityRequired;
                   }
                   return null;
                 },
@@ -718,7 +737,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _postcodeCtrl,
-                label: 'Zip/Postcode',
+                label: l10n.accountZipPostcode,
                 isRequired: true,
                 focusNode: _postcodeFocus,
                 keyboardType: TextInputType.text,
@@ -727,7 +746,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
                     FocusScope.of(context).requestFocus(_phoneFocus),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Zip/Postcode is required';
+                    return l10n.accountZipPostcodeRequired;
                   }
                   return null;
                 },
@@ -738,14 +757,14 @@ class _AddAddressPageState extends State<AddAddressPage> {
             _fieldWrapper(
               child: AddressFormField(
                 controller: _phoneCtrl,
-                label: 'TelePhone',
+                label: l10n.accountTelephone,
                 isRequired: true,
                 focusNode: _phoneFocus,
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.done,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Phone number is required';
+                    return l10n.accountPhoneNumberRequired;
                   }
                   return null;
                 },
@@ -757,7 +776,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             // ── Change default billing address switch ──
             _buildSwitch(
               isDark: isDark,
-              label: 'Change default billing address',
+              label: l10n.accountChangeDefaultBillingAddress,
               value: _isDefaultBilling,
               onChanged: (v) => setState(() => _isDefaultBilling = v),
             ),
@@ -767,7 +786,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             // ── Change default shipping address switch ──
             _buildSwitch(
               isDark: isDark,
-              label: 'Change default shipping address',
+              label: l10n.accountChangeDefaultShippingAddress,
               value: _isDefaultShipping,
               onChanged: (v) => setState(() => _isDefaultShipping = v),
             ),
@@ -841,6 +860,8 @@ class _AddAddressPageState extends State<AddAddressPage> {
 
   /// Bottom sticky "Save to Address Book" button
   Widget _buildBottomButton(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: isDark ? AppColors.neutral800 : AppColors.neutral50,
       padding: EdgeInsets.fromLTRB(
@@ -878,7 +899,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
                     color: AppColors.white,
                   ),
                 )
-              : Text(_isEditing ? 'Update Address' : 'Save to Address Book'),
+              : Text(_isEditing ? l10n.accountUpdateAddress : l10n.accountSaveToAddressBook),
         ),
       ),
     );

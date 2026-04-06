@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/currency/currency_formatter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/filter_model.dart';
 
 /// Filter bottom sheet – Figma node 103:1558
@@ -218,7 +220,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
           Row(
             children: [
               Text(
-                'Filters',
+                AppLocalizations.of(context)!.categoryFilters,
                 style: AppTextStyles.text3(context),
               ),
               if (_totalSelected > 0) ...[
@@ -255,10 +257,10 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     });
                     widget.onClearAll();
                   },
-                  child: const Padding(
-                    padding: EdgeInsets.only(right: 16),
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16),
                     child: Text(
-                      'Clear All',
+                      AppLocalizations.of(context)!.categoryClearAll,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 14,
@@ -468,7 +470,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '\$${rangeMin.toStringAsFixed(0)}',
+                CurrencyFormatter.formatAmount(rangeMin, fractionDigits: 0),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 12,
@@ -476,7 +478,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                 ),
               ),
               Text(
-                '\$${rangeMax.toStringAsFixed(0)}',
+                CurrencyFormatter.formatAmount(rangeMax, fractionDigits: 0),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 12,
@@ -501,7 +503,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
         color: isDark ? AppColors.neutral700 : AppColors.neutral50,
       ),
       child: Text(
-        '\$${value.toStringAsFixed(0)}',
+        CurrencyFormatter.formatAmount(value, fractionDigits: 0),
         style: TextStyle(
           fontFamily: 'Roboto',
           fontSize: 16,
@@ -817,7 +819,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             ),
             const SizedBox(height: 12),
             Text(
-              'No filters available',
+              AppLocalizations.of(context)!.categoryNoFiltersAvailable,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 16,
@@ -827,7 +829,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Filters will appear when available for this category',
+              AppLocalizations.of(context)!.categoryFiltersWillAppear,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 13,
@@ -871,8 +873,8 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
           ),
           child: Text(
             _totalSelected > 0
-                ? 'Apply Filters ($_totalSelected)'
-                : 'Apply Filters',
+                ? AppLocalizations.of(context)!.categoryApplyFiltersCount(_totalSelected)
+                : AppLocalizations.of(context)!.categoryApplyFilters,
             style: const TextStyle(
               fontFamily: 'Roboto',
               fontSize: 16,

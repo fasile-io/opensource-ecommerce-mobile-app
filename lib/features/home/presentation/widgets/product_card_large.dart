@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/home_models.dart';
 
 /// Large product card (Figma node 86:962).
@@ -21,6 +22,7 @@ class ProductCardLarge extends StatelessWidget {
   final VoidCallback? onWishlistTap;
   final bool isWishlisted;
   final bool isWishlistProcessing;
+  final bool showWishlistIcon;
 
   /// Optional explicit width. If null, calculated from screen width.
   final double? cardWidth;
@@ -33,6 +35,7 @@ class ProductCardLarge extends StatelessWidget {
     this.onWishlistTap,
     this.isWishlisted = false,
     this.isWishlistProcessing = false,
+    this.showWishlistIcon = true,
     this.cardWidth,
   });
 
@@ -99,45 +102,47 @@ class ProductCardLarge extends StatelessWidget {
                     fit: BoxFit.cover,
                     width: size,
                     height: size,
-                    errorBuilder: (_, __, ___) => _imagePlaceholder(isDark),
+                    errorBuilder: (context, error, stackTrace) =>
+                        _imagePlaceholder(isDark),
                   )
                 : _imagePlaceholder(isDark),
           ),
         ),
-        // Wishlist heart icon (top-right 24×24)
-        Positioned(
-          top: 5,
-          right: 5,
-          child: GestureDetector(
-            onTap: isWishlistProcessing ? null : onWishlistTap,
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: 0.9),
-                shape: BoxShape.circle,
-              ),
-              child: isWishlistProcessing
-                  ? const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.neutral400,
+        if (showWishlistIcon)
+          Positioned(
+            top: 5,
+            right: 5,
+            child: GestureDetector(
+              onTap: isWishlistProcessing ? null : onWishlistTap,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.9),
+                  shape: BoxShape.circle,
+                ),
+                child: isWishlistProcessing
+                    ? const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.neutral400,
+                        ),
+                      )
+                    : Icon(
+                        isWishlisted ? Icons.favorite : Icons.favorite_border,
+                        size: 16,
+                        color: isWishlisted ? Colors.red : AppColors.neutral800,
                       ),
-                    )
-                  : Icon(
-                      isWishlisted ? Icons.favorite : Icons.favorite_border,
-                      size: 16,
-                      color: isWishlisted ? Colors.red : AppColors.neutral800,
-                    ),
+              ),
             ),
           ),
-        ),
       ],
     );
   }
 
   Widget _buildPriceRow(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (product.hasDiscount) {
       // Figma: flex row (not wrap) with gap-3, items centered vertically
@@ -150,7 +155,7 @@ class ProductCardLarge extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              '\$${product.specialPrice!.toStringAsFixed(2)}',
+              product.displayPriceLabel,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -161,7 +166,7 @@ class ProductCardLarge extends StatelessWidget {
             ),
             const SizedBox(width: 3),
             Text(
-              '\$${product.price.toStringAsFixed(2)}',
+              product.originalPriceLabel ?? '',
               style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -173,7 +178,7 @@ class ProductCardLarge extends StatelessWidget {
             ),
             const SizedBox(width: 3),
             Text(
-              '${product.discountPercent}% off',
+              l10n.homeDiscountOff(product.discountPercent.toString()),
               style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -187,15 +192,8 @@ class ProductCardLarge extends StatelessWidget {
       );
     }
 
-    final displayPrice =
-        product.type == 'configurable' &&
-            product.minimumPrice != null &&
-            product.minimumPrice! > 0
-        ? '\$${product.minimumPrice!.toStringAsFixed(2)}'
-        : '\$${product.price.toStringAsFixed(2)}';
-
     return Text(
-      displayPrice,
+      product.displayPriceLabel,
       style: TextStyle(
         fontFamily: 'Roboto',
         fontWeight: FontWeight.w600,

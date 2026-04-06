@@ -16,6 +16,8 @@ class SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    const arrowSize = 20.0;
+    const tapTargetSize = 44.0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -32,16 +34,28 @@ class SectionHeader extends StatelessWidget {
             ),
           ),
           if (onViewAll != null)
-            GestureDetector(
-              onTap: onViewAll,
-              child: Container(
-                width: 31,
-                height: 19,
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.arrow_circle_right,
-                  size: 19,
-                  color: AppColors.primary500,
+            Semantics(
+              button: true,
+              child: Material(
+                color: Colors.transparent,
+                child: InkResponse(
+                  onTap: onViewAll,
+                  radius: tapTargetSize / 2,
+                  containedInkWell: false,
+                  highlightShape: BoxShape.circle,
+                  splashColor: AppColors.primary500.withValues(alpha: 0.16),
+                  highlightColor: AppColors.primary500.withValues(alpha: 0.08),
+                  child: SizedBox(
+                    width: tapTargetSize,
+                    height: tapTargetSize,
+                    child: Center(
+                      child: Icon(
+                        Icons.arrow_circle_right,
+                        size: arrowSize,
+                        color: AppColors.primary500,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

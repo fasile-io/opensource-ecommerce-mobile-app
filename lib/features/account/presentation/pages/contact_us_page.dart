@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../bloc/contact_us_cubit.dart';
 
 /// Contact Us Page - Modal bottom sheet with form
@@ -10,8 +11,8 @@ class ContactUsPage extends StatefulWidget {
   const ContactUsPage({super.key});
 
   /// Show the contact us bottom sheet from any context
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet<void>(
+  static Future<void> show(BuildContext context) async {
+    final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -20,6 +21,63 @@ class ContactUsPage extends StatefulWidget {
         child: const ContactUsPage(),
       ),
     );
+
+    if (result != null && context.mounted) {
+      _showOverlayToast(context, result);
+    }
+  }
+
+  /// Show a toast message on top of everything using Overlay
+  static void _showOverlayToast(BuildContext context, String message) {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    late OverlayEntry entry;
+
+    entry = OverlayEntry(
+      builder: (context) {
+        final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+        return Positioned(
+          bottom: bottomPadding + 24,
+          left: 20,
+          right: 20,
+          child: Material(
+            elevation: 6,
+            borderRadius: BorderRadius.circular(12),
+            color: AppColors.successGreen,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline,
+                    color: AppColors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (entry.mounted) {
+        entry.remove();
+      }
+    });
   }
 
   @override
@@ -27,6 +85,7 @@ class ContactUsPage extends StatefulWidget {
 }
 
 class _ContactUsPageState extends State<ContactUsPage> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _contactController;
@@ -53,6 +112,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = isDark ? AppColors.neutral800 : AppColors.white;
     final textColor = isDark ? AppColors.neutral200 : AppColors.neutral900;
     final secondaryTextColor = isDark ? AppColors.neutral400 : AppColors.neutral500;
@@ -79,155 +139,151 @@ class _ContactUsPageState extends State<ContactUsPage> {
             child: BlocListener<ContactUsCubit, ContactUsState>(
               listener: (context, state) {
                 if (state.isSuccess) {
-                  // Show success message
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.successMessage ?? 'Message sent successfully!'),
-                      backgroundColor: AppColors.success500,
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                  // Close the sheet after brief delay
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    if (mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  });
-                }
-                if (state.errorMessage != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.errorMessage ?? 'An error occurred'),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
+                  final message = state.successMessage ??
+                      l10n.accountMessageSentSuccessfully;
+                  Navigator.of(context).pop(message);
+                } else if (state.errorMessage != null) {
+                  Navigator.of(context).pop(state.errorMessage);
                 }
               },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Header ──
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Contact Us',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w500,
-                          fontSize: 18,
-                          color: textColor,
-                        ),
-                      ),
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Icon(
-                            Icons.close,
-                            size: 20,
+              child: BlocBuilder<ContactUsCubit, ContactUsState>(
+                builder: (context, state) {
+                  return Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    // ── Header ──
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          l10n.accountContactUs,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontWeight: FontWeight.w500,
+                            fontSize: 18,
                             color: textColor,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ── Name Field ──
-                  _buildTextField(
-                    label: 'Name',
-                    controller: _nameController,
-                    hintText: 'Enter your name',
-                    inputBg: inputBg,
-                    textColor: textColor,
-                    secondaryTextColor: secondaryTextColor,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Email Field ──
-                  _buildTextField(
-                    label: 'Email',
-                    controller: _emailController,
-                    hintText: 'Enter your email',
-                    keyboardType: TextInputType.emailAddress,
-                    inputBg: inputBg,
-                    textColor: textColor,
-                    secondaryTextColor: secondaryTextColor,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Contact (Phone) Field ──
-                  _buildTextField(
-                    label: 'Contact',
-                    controller: _contactController,
-                    hintText: 'Enter your phone number',
-                    keyboardType: TextInputType.phone,
-                    inputBg: inputBg,
-                    textColor: textColor,
-                    secondaryTextColor: secondaryTextColor,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ── Message Field ──
-                  _buildTextField(
-                    label: 'Message',
-                    controller: _messageController,
-                    hintText: 'Enter your message',
-                    minLines: 4,
-                    maxLines: 6,
-                    inputBg: inputBg,
-                    textColor: textColor,
-                    secondaryTextColor: secondaryTextColor,
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // ── Save Button ──
-                  BlocBuilder<ContactUsCubit, ContactUsState>(
-                    builder: (context, state) {
-                      return SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: state.isSubmitting ? null : _handleSubmit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary500,
-                            disabledBackgroundColor: AppColors.primary600,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => Navigator.of(context).pop(),
+                            child: Icon(
+                              Icons.close,
+                              size: 20,
+                              color: textColor,
                             ),
                           ),
-                          child: state.isSubmitting
-                              ? SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      isDark ? AppColors.white : AppColors.neutral900,
-                                    ),
-                                  ),
-                                )
-                              : Text(
-                                  'Send Message',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 14,
-                                    color: AppColors.white,
-                                  ),
-                                ),
                         ),
-                      );
-                    },
-                  ),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    _buildTextField(
+                      label: l10n.accountName,
+                      controller: _nameController,
+                      hintText: l10n.accountEnterYourName,
+                      inputBg: inputBg,
+                      textColor: textColor,
+                      secondaryTextColor: secondaryTextColor,
+                      isDark: isDark,
+                      validator: _validateName,
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildTextField(
+                      label: l10n.checkoutEmail,
+                      controller: _emailController,
+                      hintText: l10n.accountEnterYourEmail,
+                      keyboardType: TextInputType.emailAddress,
+                      inputBg: inputBg,
+                      textColor: textColor,
+                      secondaryTextColor: secondaryTextColor,
+                      isDark: isDark,
+                      validator: _validateEmail,
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildTextField(
+                      label: l10n.accountContact,
+                      controller: _contactController,
+                      hintText: l10n.accountEnterYourPhoneNumber,
+                      keyboardType: TextInputType.phone,
+                      inputBg: inputBg,
+                      textColor: textColor,
+                      secondaryTextColor: secondaryTextColor,
+                      isDark: isDark,
+                      validator: _validatePhone,
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildTextField(
+                      label: l10n.accountMessage,
+                      controller: _messageController,
+                      hintText: l10n.accountEnterYourMessage,
+                      minLines: 4,
+                      maxLines: 6,
+                      inputBg: inputBg,
+                      textColor: textColor,
+                      secondaryTextColor: secondaryTextColor,
+                      isDark: isDark,
+                      validator: _validateMessage,
+                    ),
+                    const SizedBox(height: 24),
+
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed:
+                                state.isSubmitting ? null : _handleSubmit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary500,
+                              disabledBackgroundColor: AppColors.primary600,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              l10n.accountSendMessage,
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                                color: AppColors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (state.isSubmitting) ...[
+                          const SizedBox(height: 12),
+                          const Center(
+                            child: SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -248,6 +304,7 @@ class _ContactUsPageState extends State<ContactUsPage> {
     required Color textColor,
     required Color secondaryTextColor,
     required bool isDark,
+    String? Function(String?)? validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,11 +319,13 @@ class _ContactUsPageState extends State<ContactUsPage> {
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
+        TextFormField(
           controller: controller,
           keyboardType: keyboardType,
           minLines: minLines,
           maxLines: maxLines,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          validator: validator,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w400,
@@ -287,6 +346,12 @@ class _ContactUsPageState extends State<ContactUsPage> {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
             ),
+            errorStyle: const TextStyle(
+              fontFamily: 'Roboto',
+              fontWeight: FontWeight.w400,
+              fontSize: 12,
+              color: AppColors.primary600,
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,
               vertical: 12,
@@ -299,50 +364,16 @@ class _ContactUsPageState extends State<ContactUsPage> {
 
   /// Handle form submission
   void _handleSubmit() {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final contact = _contactController.text.trim();
     final message = _messageController.text.trim();
-
-    // Validate name
-    if (name.isEmpty) {
-      _showErrorSnackbar('Name field cannot be empty');
-      return;
-    }
-    if (name.length < 2) {
-      _showErrorSnackbar('Name must be at least 2 characters');
-      return;
-    }
-
-    // Validate email
-    if (email.isEmpty) {
-      _showErrorSnackbar('Email field cannot be empty');
-      return;
-    }
-    if (!_isValidEmail(email)) {
-      _showErrorSnackbar('Please enter a valid email address');
-      return;
-    }
-
-    // Validate contact number
-    if (contact.isEmpty) {
-      _showErrorSnackbar('Contact number cannot be empty');
-      return;
-    }
-    if (contact.length < 10) {
-      _showErrorSnackbar('Please enter a valid contact number');
-      return;
-    }
-
-    // Validate message
-    if (message.isEmpty) {
-      _showErrorSnackbar('Message field cannot be empty');
-      return;
-    }
-    if (message.length < 10) {
-      _showErrorSnackbar('Message must be at least 10 characters');
-      return;
-    }
 
     // Submit form
     context.read<ContactUsCubit>().submitContactForm(
@@ -353,22 +384,41 @@ class _ContactUsPageState extends State<ContactUsPage> {
         );
   }
 
-  /// Validate email format
-  bool _isValidEmail(String email) {
+  String? _validateName(String? value) {
+    final l10n = AppLocalizations.of(context)!;
+    final name = value?.trim() ?? '';
+    if (name.isEmpty) return l10n.accountNameFieldEmpty;
+    if (name.length < 2) return l10n.accountNameMinChars;
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    final l10n = AppLocalizations.of(context)!;
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) return l10n.accountEmailFieldEmpty;
     final emailRegex = RegExp(
       r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
     );
-    return emailRegex.hasMatch(email);
+    if (!emailRegex.hasMatch(email)) {
+      return l10n.accountPleaseEnterValidEmailAddress;
+    }
+    return null;
   }
 
-  /// Show error snackbar
-  void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  String? _validatePhone(String? value) {
+    final l10n = AppLocalizations.of(context)!;
+    final contact = value?.trim() ?? '';
+    if (contact.isEmpty) return l10n.accountContactNumberEmpty;
+    final digits = contact.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length < 10) return l10n.accountPleaseEnterValidContactNumber;
+    return null;
+  }
+
+  String? _validateMessage(String? value) {
+    final l10n = AppLocalizations.of(context)!;
+    final message = value?.trim() ?? '';
+    if (message.isEmpty) return l10n.accountMessageFieldEmpty;
+    if (message.length < 10) return l10n.accountMessageMinChars;
+    return null;
   }
 }

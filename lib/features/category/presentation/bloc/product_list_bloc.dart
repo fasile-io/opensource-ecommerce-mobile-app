@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/filter_model.dart';
 import '../../data/models/product_model.dart';
 import '../../data/repository/category_repository.dart';
@@ -37,7 +38,12 @@ class LoadProductList extends ProductListEvent {
   });
 
   @override
-  List<Object?> get props => [categoryId, categoryName, categorySlug, initialFilter];
+  List<Object?> get props => [
+    categoryId,
+    categoryName,
+    categorySlug,
+    initialFilter,
+  ];
 }
 
 /// Apply a sort option
@@ -154,7 +160,6 @@ class ProductListState extends Equatable {
     this.selectedPriceMax,
     this.currentSort = const SortOption(
       key: 'name-asc',
-      title: 'From A-Z',
       sortKey: 'TITLE',
       reverse: false,
     ),
@@ -225,7 +230,8 @@ class ProductListState extends Equatable {
     if (selectedPriceMin != null || selectedPriceMax != null) {
       final min = selectedPriceMin ?? priceRangeMin ?? 0;
       final max = selectedPriceMax ?? priceRangeMax ?? 99999;
-      filterMap['price'] = '${min.toStringAsFixed(0)},${max.toStringAsFixed(0)}';
+      filterMap['price'] =
+          '${min.toStringAsFixed(0)},${max.toStringAsFixed(0)}';
     }
 
     // 5. Ensure ALL values are strings (API requires string values)
@@ -273,8 +279,12 @@ class ProductListState extends Equatable {
       activeFilters: activeFilters ?? this.activeFilters,
       priceRangeMin: priceRangeMin ?? this.priceRangeMin,
       priceRangeMax: priceRangeMax ?? this.priceRangeMax,
-      selectedPriceMin: clearPriceSelection ? null : (selectedPriceMin ?? this.selectedPriceMin),
-      selectedPriceMax: clearPriceSelection ? null : (selectedPriceMax ?? this.selectedPriceMax),
+      selectedPriceMin: clearPriceSelection
+          ? null
+          : (selectedPriceMin ?? this.selectedPriceMin),
+      selectedPriceMax: clearPriceSelection
+          ? null
+          : (selectedPriceMax ?? this.selectedPriceMax),
       currentSort: currentSort ?? this.currentSort,
       isLoadingFilters: isLoadingFilters ?? this.isLoadingFilters,
       errorMessage: errorMessage ?? this.errorMessage,
@@ -328,12 +338,14 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
     Emitter<ProductListState> emit,
   ) async {
     // Build filter string first to check for cached data
-    final filterString = state.copyWith(
-      categoryId: event.categoryId,
-      categoryName: event.categoryName,
-      categorySlug: event.categorySlug,
-      initialFilter: event.initialFilter,
-    ).buildFilterString();
+    final filterString = state
+        .copyWith(
+          categoryId: event.categoryId,
+          categoryName: event.categoryName,
+          categorySlug: event.categorySlug,
+          initialFilter: event.initialFilter,
+        )
+        .buildFilterString();
 
     debugPrint(
       '[ProductListBloc] LoadProductList categoryId=${event.categoryId}, '
@@ -364,25 +376,45 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
         );
 
         // Emit cached data with 'refreshing' status (no loader shown)
-        emit(state.copyWith(
-          status: ProductListStatus.refreshing,
-          categoryId: event.categoryId,
-          categoryName: event.categoryName,
-          categorySlug: event.categorySlug,
-          initialFilter: event.initialFilter,
-          products: cachedResult.products,
-          pageInfo: cachedResult.pageInfo,
-          totalProducts: cachedResult.totalCount,
-          isLoadingFilters: false,
-          isCacheFirstLoad: true,
-        ));
+        emit(
+          state.copyWith(
+            status: ProductListStatus.refreshing,
+            categoryId: event.categoryId,
+            categoryName: event.categoryName,
+            categorySlug: event.categorySlug,
+            initialFilter: event.initialFilter,
+            products: cachedResult.products,
+            pageInfo: cachedResult.pageInfo,
+            totalProducts: cachedResult.totalCount,
+            isLoadingFilters: false,
+            isCacheFirstLoad: true,
+          ),
+        );
 
         // STEP 2: Fetch fresh data from network in background
         await _refreshFromNetwork(event, emit, filterString);
       } else {
         // No cached data - show loader and fetch from network
         debugPrint('[ProductListBloc] No cached data - showing loader');
-        emit(state.copyWith(
+        emit(
+          state.copyWith(
+            status: ProductListStatus.loading,
+            categoryId: event.categoryId,
+            categoryName: event.categoryName,
+            categorySlug: event.categorySlug,
+            initialFilter: event.initialFilter,
+            isCacheFirstLoad: false,
+            isLoadingFilters: true,
+          ),
+        );
+
+        await _fetchFromNetwork(event, emit, filterString);
+      }
+    } catch (e) {
+      // Cache lookup failed - treat as first load
+      debugPrint('[ProductListBloc] Cache lookup failed: $e');
+      emit(
+        state.copyWith(
           status: ProductListStatus.loading,
           categoryId: event.categoryId,
           categoryName: event.categoryName,
@@ -390,22 +422,8 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
           initialFilter: event.initialFilter,
           isCacheFirstLoad: false,
           isLoadingFilters: true,
-        ));
-
-        await _fetchFromNetwork(event, emit, filterString);
-      }
-    } catch (e) {
-      // Cache lookup failed - treat as first load
-      debugPrint('[ProductListBloc] Cache lookup failed: $e');
-      emit(state.copyWith(
-        status: ProductListStatus.loading,
-        categoryId: event.categoryId,
-        categoryName: event.categoryName,
-        categorySlug: event.categorySlug,
-        initialFilter: event.initialFilter,
-        isCacheFirstLoad: false,
-        isLoadingFilters: true,
-      ));
+        ),
+      );
 
       await _fetchFromNetwork(event, emit, filterString);
     }
@@ -422,9 +440,9 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
         repository
             .getCategoryAttributeFilters(categorySlug: event.categorySlug)
             .catchError((e) {
-          debugPrint('[ProductListBloc] Filter fetch failed: $e');
-          return <FilterAttribute>[];
-        }),
+              debugPrint('[ProductListBloc] Filter fetch failed: $e');
+              return <FilterAttribute>[];
+            }),
         repository.getFilterProducts(
           filter: filterString,
           first: 12,
@@ -447,36 +465,46 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
         }
       }
 
-      emit(state.copyWith(
-        status: ProductListStatus.loaded,
-        products: result.products,
-        pageInfo: result.pageInfo,
-        totalProducts: result.totalCount,
-        filterAttributes: filterAttributes,
-        priceRangeMin: priceMin,
-        priceRangeMax: priceMax,
-        isLoadingFilters: false,
-        isCacheFirstLoad: false,
-      ));
+      emit(
+        state.copyWith(
+          status: ProductListStatus.loaded,
+          products: result.products,
+          pageInfo: result.pageInfo,
+          totalProducts: result.totalCount,
+          filterAttributes: filterAttributes,
+          priceRangeMin: priceMin,
+          priceRangeMax: priceMax,
+          isLoadingFilters: false,
+          isCacheFirstLoad: false,
+        ),
+      );
     } catch (e, stack) {
       debugPrint('[ProductListBloc] Network fetch failed: $e');
       debugPrint('$stack');
 
       // If we were in cache-first mode and network fails, keep showing cached data
-      if (state.status == ProductListStatus.refreshing && state.products.isNotEmpty) {
+      if (state.status == ProductListStatus.refreshing &&
+          state.products.isNotEmpty) {
         debugPrint('[ProductListBloc] Network failed, keeping cached products');
-        emit(state.copyWith(
-          status: ProductListStatus.loaded,
-          isLoadingFilters: false,
-          isCacheFirstLoad: false,
-        ));
+        emit(
+          state.copyWith(
+            status: ProductListStatus.loaded,
+            isLoadingFilters: false,
+            isCacheFirstLoad: false,
+          ),
+        );
       } else {
-        emit(state.copyWith(
-          status: ProductListStatus.error,
-          errorMessage: e.toString(),
-          isLoadingFilters: false,
-          isCacheFirstLoad: false,
-        ));
+        emit(
+          state.copyWith(
+            status: ProductListStatus.error,
+            errorMessage: ErrorMapper.getUserMessage(
+              e,
+              context: 'loading products',
+            ),
+            isLoadingFilters: false,
+            isCacheFirstLoad: false,
+          ),
+        );
       }
     }
   }
@@ -493,9 +521,11 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
         repository
             .getCategoryAttributeFilters(categorySlug: event.categorySlug)
             .catchError((e) {
-          debugPrint('[ProductListBloc] Background filter fetch failed: $e');
-          return <FilterAttribute>[];
-        }),
+              debugPrint(
+                '[ProductListBloc] Background filter fetch failed: $e',
+              );
+              return <FilterAttribute>[];
+            }),
         repository.getFilterProducts(
           filter: filterString,
           first: 12,
@@ -525,37 +555,43 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
 
       // Only update if we got valid data from network
       if (result.products.isNotEmpty) {
-        emit(state.copyWith(
-          status: ProductListStatus.loaded,
-          products: result.products,
-          pageInfo: result.pageInfo,
-          totalProducts: result.totalCount,
-          filterAttributes: filterAttributes,
-          priceRangeMin: priceMin,
-          priceRangeMax: priceMax,
-          isLoadingFilters: false,
-          isCacheFirstLoad: false,
-        ));
+        emit(
+          state.copyWith(
+            status: ProductListStatus.loaded,
+            products: result.products,
+            pageInfo: result.pageInfo,
+            totalProducts: result.totalCount,
+            filterAttributes: filterAttributes,
+            priceRangeMin: priceMin,
+            priceRangeMax: priceMax,
+            isLoadingFilters: false,
+            isCacheFirstLoad: false,
+          ),
+        );
       } else {
         // Network returned empty, keep cached data
-        emit(state.copyWith(
-          status: ProductListStatus.loaded,
-          filterAttributes: filterAttributes,
-          priceRangeMin: priceMin,
-          priceRangeMax: priceMax,
-          isLoadingFilters: false,
-          isCacheFirstLoad: false,
-        ));
+        emit(
+          state.copyWith(
+            status: ProductListStatus.loaded,
+            filterAttributes: filterAttributes,
+            priceRangeMin: priceMin,
+            priceRangeMax: priceMax,
+            isLoadingFilters: false,
+            isCacheFirstLoad: false,
+          ),
+        );
       }
     } catch (e, stack) {
       debugPrint('[ProductListBloc] Background refresh failed: $e');
       debugPrint('$stack');
       // Keep showing cached data on background refresh failure
-      emit(state.copyWith(
-        status: ProductListStatus.loaded,
-        isLoadingFilters: false,
-        isCacheFirstLoad: false,
-      ));
+      emit(
+        state.copyWith(
+          status: ProductListStatus.loaded,
+          isLoadingFilters: false,
+          isCacheFirstLoad: false,
+        ),
+      );
     }
   }
 
@@ -616,11 +652,13 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
     ClearAllFilters event,
     Emitter<ProductListState> emit,
   ) async {
-    emit(state.copyWith(
-      activeFilters: {},
-      clearPriceSelection: true,
-      status: ProductListStatus.loading,
-    ));
+    emit(
+      state.copyWith(
+        activeFilters: {},
+        clearPriceSelection: true,
+        status: ProductListStatus.loading,
+      ),
+    );
 
     await _reloadProducts(emit);
   }
@@ -637,10 +675,9 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
     UpdatePriceRange event,
     Emitter<ProductListState> emit,
   ) {
-    emit(state.copyWith(
-      selectedPriceMin: event.min,
-      selectedPriceMax: event.max,
-    ));
+    emit(
+      state.copyWith(selectedPriceMin: event.min, selectedPriceMax: event.max),
+    );
   }
 
   Future<void> _reloadProducts(Emitter<ProductListState> emit) async {
@@ -665,7 +702,10 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
       emit(
         state.copyWith(
           status: ProductListStatus.error,
-          errorMessage: e.toString(),
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading products',
+          ),
         ),
       );
     }
@@ -712,7 +752,15 @@ class ProductListBloc extends Bloc<ProductListEvent, ProductListState> {
         ),
       );
     } catch (e) {
-      emit(state.copyWith(isLoadingMore: false, errorMessage: e.toString()));
+      emit(
+        state.copyWith(
+          isLoadingMore: false,
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading more products',
+          ),
+        ),
+      );
     }
   }
 }

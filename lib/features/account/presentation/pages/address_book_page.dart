@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/repository/account_repository.dart';
 import '../bloc/address_book_bloc.dart';
 import '../widgets/address_card.dart';
@@ -105,6 +106,8 @@ class AddressBookPage extends StatelessWidget {
   /// Navigation bar — back arrow + "Address Book" title
   /// Figma: node-id=204:4667
   Widget _buildNavBar(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       color: isDark ? AppColors.neutral900 : AppColors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -114,7 +117,7 @@ class AddressBookPage extends StatelessWidget {
           // Back arrow with a11y
           Semantics(
             button: true,
-            label: 'Go back',
+            label: l10n.accountGoBack,
             child: Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(10),
@@ -122,7 +125,7 @@ class AddressBookPage extends StatelessWidget {
                 onTap: () => Navigator.of(context).pop(),
                 borderRadius: BorderRadius.circular(10),
                 child: Tooltip(
-                  message: 'Back',
+                  message: l10n.accountBack,
                   child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: Icon(
@@ -143,7 +146,7 @@ class AddressBookPage extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                'Address Book',
+                l10n.accountAddressBook,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -162,6 +165,7 @@ class AddressBookPage extends StatelessWidget {
   /// Bottom sticky "Add New Address" button
   /// Figma: node-id=204:4660
   Widget _buildBottomButton(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
     // Capture providers from the outer context which has access to
     // RepositoryProvider<AccountRepository> — the BlocSelector's inner
     // context sits below it and may not resolve the provider.
@@ -217,7 +221,7 @@ class AddressBookPage extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
-              child: const Text('Add New Address'),
+              child: Text(l10n.accountAddNewAddress),
             ),
           ),
         );
@@ -231,6 +235,8 @@ class AddressBookPage extends StatelessWidget {
     String? errorMessage,
     bool isDark,
   ) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -240,7 +246,7 @@ class AddressBookPage extends StatelessWidget {
             Icon(Icons.error_outline, size: 64, color: AppColors.neutral400),
             const SizedBox(height: 16),
             Text(
-              'Could not load addresses',
+              l10n.accountCouldNotLoadAddresses,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -250,7 +256,7 @@ class AddressBookPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              errorMessage ?? 'Please try again',
+              errorMessage ?? l10n.accountPleaseTryAgain,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -271,7 +277,7 @@ class AddressBookPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text('Retry'),
+              child: Text(l10n.commonRetry),
             ),
           ],
         ),
@@ -281,6 +287,8 @@ class AddressBookPage extends StatelessWidget {
 
   /// Empty state — wrapped in scrollable for pull-to-refresh
   Widget _buildEmptyView(BuildContext context, bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return RefreshIndicator(
       color: AppColors.primary500,
       onRefresh: () {
@@ -309,7 +317,7 @@ class AddressBookPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No addresses saved',
+                        l10n.accountNoAddressesSaved,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w600,
@@ -321,7 +329,7 @@ class AddressBookPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Add a new address to get started',
+                        l10n.accountAddAddressToGetStarted,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w400,

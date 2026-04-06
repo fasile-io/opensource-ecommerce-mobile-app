@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../category/data/models/product_model.dart';
 import '../../../cart/presentation/bloc/cart_bloc.dart';
 import '../bloc/product_detail_bloc.dart';
 
@@ -13,14 +15,17 @@ class ProductActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return BlocListener<CartBloc, CartState>(
       listener: (context, cartState) {
         if (cartState.successMessage != null) {
+          final message =
+              _localizedCartMessage(context, cartState.successMessage!);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(cartState.successMessage!),
+              content: Text(message),
               backgroundColor: AppColors.successGreen,
               duration: const Duration(seconds: 2),
             ),
@@ -82,7 +87,7 @@ class ProductActionBar extends StatelessWidget {
                                 ),
                               )
                             : Text(
-                                'Add to Cart',
+                                l10n.productAddToCart,
                                 style: TextStyle(
                                   fontFamily: 'Roboto',
                                   fontSize: 16,
@@ -107,8 +112,8 @@ class ProductActionBar extends StatelessWidget {
                           borderRadius: BorderRadius.circular(54),
                         ),
                         alignment: Alignment.center,
-                        child: const Text(
-                          'Buy Now',
+                        child: Text(
+                          l10n.productBuyNow,
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontSize: 16,
@@ -133,35 +138,378 @@ class ProductActionBar extends StatelessWidget {
     final product = productState.product;
     if (product == null) return;
 
-    // For configurable products, check that a variant is selected
-    if (product.isConfigurable) {
-      final variant = productState.selectedVariant;
-      if (variant == null) {
+    final productId =
+        product.numericId ?? int.tryParse(product.id.split('/').last) ?? 0;
+
+    if (product.isGrouped) {
+      final groupedItems = product.groupedProducts
+          .map((groupedProduct) {
+            final qty = productState.groupedQuantities[groupedProduct.id] ?? 0;
+            final associatedProductId = _resolveProductId(
+              groupedProduct.associatedProduct?.numericId,
+              groupedProduct.associatedProduct?.id,
+            );
+
+            if (qty <= 0 || associatedProductId <= 0) return null;
+            return {'productId': associatedProductId, 'quantity': qty};
+          })
+          .whereType<Map<String, int>>()
+          .toList();
+
+      if (groupedItems.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please select product options first'),
+            content: Text("Please enter quantity for at least one item"),
             duration: Duration(seconds: 2),
           ),
         );
         return;
       }
-      // Add the variant (use variant's numeric ID)
+
       context.read<CartBloc>().add(
-            AddToCart(
-              productId: variant.numericId ?? int.tryParse(variant.id.split('/').last) ?? 0,
-              quantity: productState.quantity,
+        AddToCart(
+          productId: productId,
+          quantity: 1,
+          groupedItems: groupedItems,
+        ),
+      );
+    } else if (product.isBooking) {
+      final booking = product.bookingProducts.isNotEmpty
+          ? product.bookingProducts.first
+          : null;
+      if (booking == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Booking configuration is missing"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      final bookingPayload = _buildBookingPayload(
+        context: context,
+        booking: booking,
+        form: productState.bookingForm,
+        ticketQuantities: productState.bookingTicketQuantities,
+      );
+
+      if (bookingPayload == null) {
+        return;
+      }
+
+      context.read<CartBloc>().add(
+        AddToCart(
+          productId: productId,
+          quantity: 1,
+          bookingData: bookingPayload,
+        ),
+      );
+    } else if (product.isBundle) {
+      final selectedOptions = productState.selectedBundleOptions;
+      final selectedQuantities = productState.bundleOptionQuantities;
+
+      for (final option in product.bundleOptions) {
+        final selections = selectedOptions[option.id] ?? const <String>[];
+        if (option.isRequired && selections.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${option.label ?? 'Bundle option'} is required'),
+              duration: const Duration(seconds: 2),
             ),
           );
+          return;
+        }
+      }
+
+      final bundleOptions = <Map<String, dynamic>>[];
+      for (final option in product.bundleOptions) {
+        final selections = selectedOptions[option.id] ?? const <String>[];
+        if (selections.isEmpty) continue;
+
+        final optionId = _resolveProductId(null, option.id);
+        if (optionId <= 0) continue;
+
+        for (final selectionId in selections) {
+          final matches = option.bundleOptionProducts
+              .where((item) => item.id == selectionId)
+              .toList();
+          final selectedProduct = matches.isNotEmpty ? matches.first : null;
+
+          if (selectedProduct == null) continue;
+          final selectionNumericId = _resolveProductId(null, selectionId);
+          if (selectionNumericId <= 0) continue;
+
+          final qty =
+              selectedQuantities[selectionId] ??
+              ((selectedProduct.qty ?? 1) > 0 ? (selectedProduct.qty ?? 1) : 1);
+
+          bundleOptions.add({
+            'bundleOptionId': optionId,
+            'bundleOptionProductId': [selectionNumericId],
+            'qty': qty,
+          });
+        }
+      }
+
+      if (bundleOptions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please select at least one bundle option"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      context.read<CartBloc>().add(
+        AddToCart(
+          productId: productId,
+          quantity: 1,
+          bundleOptions: bundleOptions,
+        ),
+      );
+    } else if (product.isConfigurable) {
+      // New API: use combinations + superAttribute
+      final variantId = productState.selectedVariantId;
+      if (variantId == null) {
+        // Fallback: try legacy variant
+        final variant = productState.selectedVariant;
+        if (variant == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)!.productSelectOptionsFirst,
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+          return;
+        }
+        // Legacy: send variant ID as productId
+        final variantNumericId =
+            variant.numericId ?? int.tryParse(variant.id.split('/').last) ?? 0;
+        context.read<CartBloc>().add(
+          AddToCart(
+            productId: variantNumericId,
+            quantity: productState.quantity,
+          ),
+        );
+        return;
+      }
+
+      // Build superAttribute from combinations using numeric attribute IDs
+      // expected by the cart API: [{23: 5}, {24: 7}]
+      final superAttribute = <Map<String, dynamic>>[];
+      final combination = product.getCombinationForVariant(variantId);
+      if (combination != null) {
+        for (final entry in combination.entries) {
+          final attributeId = product.getConfigurableAttributeId(entry.key);
+          final attributeKey = attributeId?.toString() ?? entry.key;
+          superAttribute.add({
+            attributeKey: entry.value is int
+                ? entry.value
+                : (int.tryParse(entry.value.toString()) ?? entry.value),
+          });
+        }
+      }
+
+      context.read<CartBloc>().add(
+        AddToCart(
+          productId: productId, // Parent configurable product ID
+          quantity: productState.quantity,
+          selectedConfigurableOption: variantId,
+          superAttribute: superAttribute,
+        ),
+      );
+    } else if (product.type == 'downloadable') {
+      // Validation for downloadable products
+      if (product.downloadableLinks.isNotEmpty &&
+          productState.selectedDownloadableLinks.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.productSelectDownloadLink,
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      // Get integer IDs for selected links
+      final selectedLinkIds = productState.selectedDownloadableLinks.map((id) {
+        final link = product.downloadableLinks.firstWhere((l) => l.id == id);
+        return (link.numericId ?? int.tryParse(link.id.split('/').last) ?? 0)
+            .toString();
+      }).toList();
+
+      context.read<CartBloc>().add(
+        AddToCart(
+          productId: productId,
+          quantity: productState.quantity,
+          downloadableLinks: selectedLinkIds,
+        ),
+      );
     } else {
-      // Simple product — use product's numeric ID
-      final productId =
-          product.numericId ?? int.tryParse(product.id.split('/').last) ?? 0;
+      // Simple or Virtual
       context.read<CartBloc>().add(
-            AddToCart(
-              productId: productId,
-              quantity: productState.quantity,
+        AddToCart(productId: productId, quantity: productState.quantity),
+      );
+    }
+  }
+
+  Map<String, dynamic>? _buildBookingPayload({
+    required BuildContext context,
+    required BookingProductData booking,
+    required Map<String, dynamic> form,
+    required Map<String, int> ticketQuantities,
+  }) {
+    final type = (booking.type ?? '').toLowerCase().trim();
+
+    if (type == 'event') {
+      final qty = ticketQuantities.entries
+          .where((entry) => entry.value > 0)
+          .map((entry) {
+            final ticket = booking.eventTickets
+                .where((t) => t.id == entry.key)
+                .toList();
+            final ticketId = ticket.isNotEmpty
+                ? (ticket.first.numericId ?? int.tryParse(ticket.first.id) ?? 0)
+                : 0;
+            if (ticketId <= 0) return null;
+            return <String, dynamic>{
+              'ticketId': ticketId,
+              'quantity': entry.value,
+            };
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (qty.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please select at least one ticket"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return null;
+      }
+      return {
+        'type': 'event',
+        'qty': {
+          for (final item in qty)
+            '${item['ticketId']}': (item['quantity'] as int?) ?? 0,
+        },
+      };
+    }
+
+    final date = form['date']?.toString().trim();
+    final slot = form['slot']?.toString().trim();
+    if (type == 'default' || type == 'appointment' || type == 'table') {
+      if ((date ?? '').isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please select a booking date"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return null;
+      }
+      if ((slot ?? '').isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please select an available time slot"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return null;
+      }
+      final payload = <String, dynamic>{
+        'type': type,
+        'date': date,
+        'slot': slot,
+      };
+      if (type == 'table') {
+        final note = form['note']?.toString().trim() ?? '';
+        if (note.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Please enter special request or notes"),
+              duration: Duration(seconds: 2),
             ),
           );
+          return null;
+        }
+        payload['specialNote'] = note;
+      }
+      return payload;
+    }
+
+    if (type == 'rental') {
+      final rentingType =
+          (form['rentingType']?.toString().toLowerCase() ?? 'daily');
+      if (rentingType == 'daily') {
+        final dateFrom = form['dateFrom']?.toString().trim();
+        final dateTo = form['dateTo']?.toString().trim();
+        if ((dateFrom ?? '').isEmpty || (dateTo ?? '').isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Please select rental start and end date"),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          return null;
+        }
+        return {
+          'type': 'rental',
+          'renting_type': 'daily',
+          'date_from': dateFrom,
+          'date_to': dateTo,
+        };
+      }
+
+      if ((date ?? '').isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please select a rental date"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return null;
+      }
+      if ((slot ?? '').isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please select a rental time slot"),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return null;
+      }
+      return {
+        'type': 'rental',
+        'date': date,
+        'slot': slot,
+        'renting_type': 'hourly',
+      };
+    }
+
+    return null;
+  }
+
+  int _resolveProductId(int? numericId, String? graphId) {
+    if (numericId != null && numericId > 0) return numericId;
+    if (graphId == null || graphId.isEmpty) return 0;
+    return int.tryParse(graphId.split('/').last) ?? 0;
+  }
+
+  String _localizedCartMessage(BuildContext context, String message) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (message) {
+      case 'Product added to cart successfully':
+        return l10n.cartAddedToCartSuccess;
+      default:
+        return message;
     }
   }
 

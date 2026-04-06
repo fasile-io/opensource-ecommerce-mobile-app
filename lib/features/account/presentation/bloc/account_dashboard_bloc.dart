@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 
@@ -204,7 +205,10 @@ class AccountDashboardBloc
       emit(
         state.copyWith(
           status: AccountDashboardStatus.error,
-          errorMessage: e.toString(),
+          errorMessage: ErrorMapper.getUserMessage(
+            e,
+            context: 'loading your account',
+          ),
         ),
       );
     }
@@ -219,12 +223,7 @@ class AccountDashboardBloc
       try {
         return await call();
       } catch (e) {
-        final isNetworkError =
-            e.toString().contains('Network error') ||
-            e.toString().contains('TimeoutException') ||
-            e.toString().contains('No stream event') ||
-            e.toString().contains('SocketException');
-        if (isNetworkError && attempt < maxAttempts) {
+        if (ErrorMapper.isNetworkError(e) && attempt < maxAttempts) {
           debugPrint(
             '⚠️ Account dashboard network error (attempt $attempt/$maxAttempts, retrying): $e',
           );

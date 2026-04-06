@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../category/data/models/product_model.dart';
 import '../bloc/product_detail_bloc.dart';
 
@@ -13,7 +14,8 @@ class ProductMoreInfoSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final infoItems = _buildInfoItems();
+    final l10n = AppLocalizations.of(context)!;
+    final infoItems = _buildInfoItems(l10n);
     if (infoItems.isEmpty) return const SizedBox.shrink();
 
     return BlocBuilder<ProductDetailBloc, ProductDetailState>(
@@ -29,7 +31,7 @@ class ProductMoreInfoSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'More Informations',
+                l10n.productMoreInformations,
                 style: AppTextStyles.text4(context),
               ),
               const SizedBox(height: 16),
@@ -42,12 +44,12 @@ class ProductMoreInfoSection extends StatelessWidget {
               // Gradient + Load More
               if (needsExpand && !isExpanded) ...[
                 const SizedBox(height: 8),
-                _buildLoadMoreButton(context),
+                _buildLoadMoreButton(context, l10n),
               ],
 
               if (isExpanded && needsExpand) ...[
                 const SizedBox(height: 8),
-                _buildLoadMoreButton(context, isCollapse: true),
+                _buildLoadMoreButton(context, l10n, isCollapse: true),
               ],
             ],
           ),
@@ -56,23 +58,23 @@ class ProductMoreInfoSection extends StatelessWidget {
     );
   }
 
-  List<(String, String)> _buildInfoItems() {
+  List<(String, String)> _buildInfoItems(AppLocalizations l10n) {
     final items = <(String, String)>[];
 
     if (product.sku != null && product.sku!.isNotEmpty) {
-      items.add(('SKU', product.sku!));
+      items.add((l10n.productSku, product.sku!));
     }
     if (product.type != null && product.type!.isNotEmpty) {
-      items.add(('Type', product.type!));
+      items.add((l10n.productType, product.type!));
     }
     if (product.brand != null && product.brand!.isNotEmpty) {
-      items.add(('Brand', product.brand!));
+      items.add((l10n.productBrand, product.brand!));
     }
     if (product.color != null && product.color!.isNotEmpty) {
-      items.add(('Color', product.color!));
+      items.add((l10n.productColor, product.color!));
     }
     if (product.size != null && product.size!.isNotEmpty) {
-      items.add(('Size', product.size!));
+      items.add((l10n.productSize, product.size!));
     }
 
     return items;
@@ -111,7 +113,7 @@ class ProductMoreInfoSection extends StatelessWidget {
     );
   }
 
-  Widget _buildLoadMoreButton(BuildContext context,
+  Widget _buildLoadMoreButton(BuildContext context, AppLocalizations l10n,
       {bool isCollapse = false}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -130,7 +132,7 @@ class ProductMoreInfoSection extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Text(
-          isCollapse ? 'Show Less' : 'Load More',
+          isCollapse ? l10n.productShowLess : l10n.productLoadMore,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontSize: 14,

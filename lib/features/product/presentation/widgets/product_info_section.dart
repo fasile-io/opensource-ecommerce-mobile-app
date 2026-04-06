@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../category/data/models/product_model.dart';
 
 /// Product info: title, price row, rating badge + review count, stock chip
@@ -16,6 +17,7 @@ class ProductInfoSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
@@ -25,7 +27,7 @@ class ProductInfoSection extends StatelessWidget {
         children: [
           // ── Product Name ──
           Text(
-            product.name ?? 'Product',
+            product.name ?? l10n.productDefaultName,
             style: AppTextStyles.text4(context).copyWith(
               color: isDark ? AppColors.neutral300 : AppColors.neutral800,
             ),
@@ -41,10 +43,7 @@ class ProductInfoSection extends StatelessWidget {
           // ── Rating + Stock Row ──
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildRatingGroup(context),
-              _buildStockChip(context),
-            ],
+            children: [_buildRatingGroup(context), _buildStockChip(context)],
           ),
         ],
       ),
@@ -52,20 +51,19 @@ class ProductInfoSection extends StatelessWidget {
   }
 
   Widget _buildPriceRow(BuildContext context) {
-    // Use variant price if a variant is selected, otherwise product price
+    final l10n = AppLocalizations.of(context)!;
+    final displayPriceLabel = selectedVariant != null
+        ? selectedVariant!.displayPriceLabel
+        : product.formattedDisplayPrice;
+    final originalPrice = selectedVariant != null
+        ? selectedVariant!.originalPrice
+        : product.originalPrice;
+    final originalPriceLabel = selectedVariant != null
+        ? selectedVariant!.originalPriceLabel
+        : product.formattedOriginalPrice;
     final displayPrice = selectedVariant != null
         ? selectedVariant!.displayPrice
         : product.displayPrice;
-
-    // Original price for strikethrough
-    final originalPrice = selectedVariant != null
-        ? (selectedVariant!.specialPrice != null &&
-                selectedVariant!.specialPrice! > 0 &&
-                selectedVariant!.price != null &&
-                selectedVariant!.specialPrice! < selectedVariant!.price!
-            ? selectedVariant!.price
-            : null)
-        : product.originalPrice;
 
     // Discount percentage
     final discountPercent = (originalPrice != null && originalPrice > 0)
@@ -78,14 +76,14 @@ class ProductInfoSection extends StatelessWidget {
       children: [
         // Current price (Text-1: 24px bold)
         Text(
-          '\$${displayPrice.toStringAsFixed(2)}',
+          displayPriceLabel,
           style: AppTextStyles.text1(context),
         ),
 
         // Original price strikethrough
         if (originalPrice != null)
           Text(
-            '\$${originalPrice.toStringAsFixed(2)}',
+            originalPriceLabel ?? '',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w600,
@@ -99,7 +97,7 @@ class ProductInfoSection extends StatelessWidget {
         // Discount percentage
         if (discountPercent != null && discountPercent > 0)
           Text(
-            '$discountPercent% off',
+            l10n.productDiscountOff(discountPercent.toString()),
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w600,
@@ -161,6 +159,7 @@ class ProductInfoSection extends StatelessWidget {
   }
 
   Widget _buildStockChip(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final inStock = product.isSaleable ?? true;
 
@@ -178,7 +177,7 @@ class ProductInfoSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        inStock ? 'In Stock' : 'Out of Stock',
+        inStock ? l10n.productInStock : l10n.productOutOfStock,
         style: TextStyle(
           fontFamily: 'Roboto',
           fontSize: 12,

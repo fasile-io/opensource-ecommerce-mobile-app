@@ -1,8 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import '../../../../core/constants/api_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_back_button.dart';
+import '../../../../l10n/app_localizations.dart';
+import '../../../auth/domain/services/auth_storage.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 
@@ -64,6 +68,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
   }
 
   Future<void> _fetchInvoiceDetails() async {
+    final l10n = AppLocalizations.of(context)!;
     // If invoice has numericId and we have a repository, fetch from API
     if (widget.invoice.numericId != null && widget.repository != null) {
       setState(() {
@@ -80,7 +85,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
       } catch (e) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Failed to load invoice details';
+          _errorMessage = l10n.accountFailedToLoadInvoiceDetails;
         });
       }
     }
@@ -92,6 +97,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
@@ -103,7 +109,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
         leadingWidth: 60,
         titleSpacing: 0,
         title: Text(
-          'Invoice ${_displayInvoice.invoiceNumber}',
+          l10n.accountInvoiceNumber(_displayInvoice.invoiceNumber),
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -132,10 +138,12 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
                       const SizedBox(height: 16),
 
                       // Download Invoice Button
-                      if (_displayInvoice.downloadUrl != null &&
-                          _displayInvoice.downloadUrl!.isNotEmpty)
+                      if ((_displayInvoice.downloadUrl != null &&
+                              _displayInvoice.downloadUrl!.isNotEmpty) ||
+                          _displayInvoice.numericId != null)
                         _DownloadButton(
-                          downloadUrl: _displayInvoice.downloadUrl!,
+                          invoice: _displayInvoice,
+                          downloadUrl: _displayInvoice.downloadUrl ?? '',
                         ),
 
                       const SizedBox(height: 24),
@@ -164,6 +172,8 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
   }
 
   Widget _buildErrorState(bool isDark) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -177,7 +187,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              _errorMessage ?? 'Failed to load invoice details',
+              _errorMessage ?? l10n.accountFailedToLoadInvoiceDetails,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
@@ -188,7 +198,7 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
             const SizedBox(height: 16),
             TextButton(
               onPressed: _fetchInvoiceDetails,
-              child: const Text('Try Again'),
+              child: Text(l10n.accountTryAgain),
             ),
           ],
         ),
@@ -213,6 +223,7 @@ class _InvoiceInfoGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,16 +233,16 @@ class _InvoiceInfoGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _InfoPair(
-                label: 'Invoice Status',
-                value: _invoiceStateLabel(invoice.state),
+                label: l10n.accountInvoiceStatus,
+                value: _invoiceStateLabel(invoice.state, l10n),
                 isDark: isDark,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _InfoPair(
-                label: 'Invoice Date',
-                value: _formatDateTime(invoice.createdAt),
+                label: l10n.accountInvoiceDate,
+                value: _formatDateTime(invoice.createdAt, l10n),
                 isDark: isDark,
               ),
             ),
@@ -244,7 +255,7 @@ class _InvoiceInfoGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _InfoPair(
-                label: 'Order ID',
+                label: l10n.accountOrderId,
                 value: order.orderNumber,
                 isDark: isDark,
               ),
@@ -252,8 +263,8 @@ class _InvoiceInfoGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _InfoPair(
-                label: 'Order Date',
-                value: _formatDateTime(order.createdAt),
+                label: l10n.accountOrderDate,
+                value: _formatDateTime(order.createdAt, l10n),
                 isDark: isDark,
               ),
             ),
@@ -266,7 +277,7 @@ class _InvoiceInfoGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _InfoPair(
-                label: 'Order Status',
+                label: l10n.accountOrderStatus,
                 value: order.statusLabel,
                 isDark: isDark,
               ),
@@ -274,8 +285,8 @@ class _InvoiceInfoGrid extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _InfoPair(
-                label: 'Channel',
-                value: order.channelName ?? 'Default',
+                label: l10n.accountChannel,
+                value: order.channelName ?? l10n.accountDefault,
                 isDark: isDark,
               ),
             ),
@@ -285,32 +296,42 @@ class _InvoiceInfoGrid extends StatelessWidget {
     );
   }
 
-  String _invoiceStateLabel(String? state) {
-    if (state == null || state.isEmpty) return 'N/A';
+  String _invoiceStateLabel(String? state, AppLocalizations l10n) {
+    if (state == null || state.isEmpty) return l10n.accountNotAvailable;
     switch (state.toLowerCase()) {
       case 'paid':
-        return 'Paid';
+        return l10n.accountStatusPaid;
       case 'pending':
-        return 'Pending';
+        return l10n.accountStatusPending;
       case 'pending_payment':
-        return 'Pending Payment';
+        return l10n.accountStatusPendingPayment;
       case 'overdue':
-        return 'Overdue';
+        return l10n.accountStatusOverdue;
       case 'refunded':
-        return 'Refunded';
+        return l10n.accountStatusRefunded;
       default:
         return state[0].toUpperCase() + state.substring(1);
     }
   }
 
   /// Formats "2025-10-09T12:58:54.000000Z" → "09 Oct 2025, 12:58:54"
-  String _formatDateTime(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return 'N/A';
+  String _formatDateTime(String? dateStr, AppLocalizations l10n) {
+    if (dateStr == null || dateStr.isEmpty) return l10n.accountNotAvailable;
     try {
       final date = DateTime.parse(dateStr);
-      const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      final months = [
+        l10n.monthJanShort,
+        l10n.monthFebShort,
+        l10n.monthMarShort,
+        l10n.monthAprShort,
+        l10n.monthMayShort,
+        l10n.monthJunShort,
+        l10n.monthJulShort,
+        l10n.monthAugShort,
+        l10n.monthSepShort,
+        l10n.monthOctShort,
+        l10n.monthNovShort,
+        l10n.monthDecShort,
       ];
       final day = date.day.toString().padLeft(2, '0');
       final month = months[date.month - 1];
@@ -390,6 +411,7 @@ class _InvoiceItemsSectionState extends State<_InvoiceItemsSection> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     final itemCount = widget.invoice.items.isNotEmpty
         ? widget.invoice.items.length
         : widget.order.items.length;
@@ -404,7 +426,7 @@ class _InvoiceItemsSectionState extends State<_InvoiceItemsSection> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '$itemCount Item${itemCount == 1 ? '' : 's'} Ordered',
+                l10n.accountItemsOrdered(itemCount),
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w500,
@@ -483,6 +505,7 @@ class _InvoiceItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       width: double.infinity,
@@ -549,11 +572,11 @@ class _InvoiceItemCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _qtyRow('Ordered Qty', orderItem.qtyOrdered, isDark),
+                    _qtyRow(l10n.accountOrderedQty, orderItem.qtyOrdered, isDark),
                     const SizedBox(height: 6),
-                    _qtyRow('Shipped Qty', orderItem.qtyShipped, isDark),
+                    _qtyRow(l10n.accountShippedQty, orderItem.qtyShipped, isDark),
                     const SizedBox(height: 6),
-                    _qtyRow('Invoiced Qty', orderItem.qtyInvoiced, isDark),
+                    _qtyRow(l10n.accountInvoicedQty, orderItem.qtyInvoiced, isDark),
                   ],
                 ),
               ),
@@ -569,7 +592,7 @@ class _InvoiceItemCard extends StatelessWidget {
                       SizedBox(
                         width: 80,
                         child: Text(
-                          'Unit Price :',
+                          l10n.accountUnitPriceWithColon,
                           textAlign: TextAlign.right,
                           style: TextStyle(
                             fontFamily: 'Roboto',
@@ -603,7 +626,7 @@ class _InvoiceItemCard extends StatelessWidget {
                       SizedBox(
                         width: 80,
                         child: Text(
-                          'Sub Total :',
+                          l10n.accountSubTotalWithColon,
                           textAlign: TextAlign.right,
                           style: TextStyle(
                             fontFamily: 'Roboto',
@@ -712,13 +735,14 @@ class _InvoicePriceBreak extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Title
         Text(
-          'Price Break',
+          l10n.cartPriceBreak,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -728,37 +752,37 @@ class _InvoicePriceBreak extends StatelessWidget {
         ),
         const SizedBox(height: 8),
 
-        _priceRow('SubTotal', _formatAmount(invoice.subTotal), isDark),
+        _priceRow(l10n.cartSubTotal, _formatAmount(invoice.subTotal), isDark),
         const SizedBox(height: 6),
         _priceRow(
-          'Delivery Charges',
+          l10n.cartDeliveryCharges,
           _formatAmount(invoice.shippingAmount ?? 0),
           isDark,
         ),
         const SizedBox(height: 6),
-        _priceRow('Tax', _formatAmount(invoice.taxAmount ?? 0), isDark),
+        _priceRow(l10n.cartTax, _formatAmount(invoice.taxAmount ?? 0), isDark),
         const SizedBox(height: 6),
         _priceRow(
-          'Grand Total',
+          l10n.cartGrandTotal,
           _formatAmount(invoice.grandTotal),
           isDark,
           isBold: true,
         ),
         const SizedBox(height: 6),
         _priceRow(
-          'Total Paid',
+          l10n.accountTotalPaid,
           _formatAmount(order.grandTotalInvoiced ?? 0),
           isDark,
         ),
         const SizedBox(height: 6),
         _priceRow(
-          'Total Refunded',
+          l10n.accountTotalRefunded,
           _formatAmount(order.grandTotalRefunded ?? 0),
           isDark,
         ),
         const SizedBox(height: 6),
         _priceRow(
-          'Total Due',
+          l10n.accountTotalDue,
           _formatAmount(order.totalDue),
           isDark,
         ),
@@ -810,44 +834,47 @@ class _InvoiceInfoCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Column(
       children: [
         // Billing Address
         _InvoiceInfoCard(
-          title: 'Billing Address',
-          name: _buildAddressName(order.billingAddress),
+          title: l10n.accountBillingAddress,
+          name: _buildAddressName(context, order.billingAddress),
           details: order.billingAddress?.formattedAddress,
         ),
         const SizedBox(height: 8),
 
         // Shipping Address
         _InvoiceInfoCard(
-          title: 'Shipping Address',
-          name: _buildAddressName(order.shippingAddress),
+          title: l10n.accountShippingAddress,
+          name: _buildAddressName(context, order.shippingAddress),
           details: order.shippingAddress?.formattedAddress,
         ),
         const SizedBox(height: 8),
 
         // Shipping Method
         _InvoiceInfoCard(
-          title: 'Shipping Method',
-          name: order.shippingTitle ?? order.shippingMethod ?? 'N/A',
+          title: l10n.accountShippingMethod,
+          name: order.shippingTitle ?? order.shippingMethod ?? l10n.accountNotAvailable,
           details: order.shippingTitle ?? order.shippingMethod,
         ),
         const SizedBox(height: 8),
 
         // Payment Method
         _InvoiceInfoCard(
-          title: 'Payment Method',
-          name: order.payment?.methodTitle ?? order.payment?.method ?? 'N/A',
+          title: l10n.accountPaymentMethod,
+          name: order.payment?.methodTitle ?? order.payment?.method ?? l10n.accountNotAvailable,
           details: null,
         ),
       ],
     );
   }
 
-  String _buildAddressName(OrderAddress? address) {
-    if (address == null) return 'N/A';
+  String _buildAddressName(BuildContext context, OrderAddress? address) {
+    final l10n = AppLocalizations.of(context)!;
+    if (address == null) return l10n.accountNotAvailable;
     final name = address.fullName;
     final company = address.companyName;
     if (company != null && company.isNotEmpty) {
@@ -932,21 +959,43 @@ class _InvoiceInfoCard extends StatelessWidget {
 // Download Button Widget
 // ──────────────────────────────────────────────
 
-class _DownloadButton extends StatelessWidget {
+class _DownloadButton extends StatefulWidget {
+  final OrderInvoice invoice;
   final String downloadUrl;
 
-  const _DownloadButton({required this.downloadUrl});
+  const _DownloadButton({
+    required this.invoice,
+    required this.downloadUrl,
+  });
+
+  @override
+  State<_DownloadButton> createState() => _DownloadButtonState();
+}
+
+class _DownloadButtonState extends State<_DownloadButton> {
+  bool _isDownloading = false;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
-        onPressed: () => _openPdfInApp(context, downloadUrl),
-        icon: const Icon(Icons.download, size: 20),
-        label: const Text(
-          'Download Invoice',
+        onPressed: _isDownloading ? null : () => _downloadInvoice(context),
+        icon: _isDownloading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.download, size: 20),
+        label: Text(
+          l10n.accountDownloadInvoice,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -965,88 +1014,253 @@ class _DownloadButton extends StatelessWidget {
     );
   }
 
-  void _openPdfInApp(BuildContext context, String url) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _PdfViewerPage(pdfUrl: url),
-      ),
-    );
-  }
-}
+  Future<void> _downloadInvoice(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    setState(() => _isDownloading = true);
 
-// ──────────────────────────────────────────────
-// PDF Viewer Page
-// ──────────────────────────────────────────────
-
-class _PdfViewerPage extends StatefulWidget {
-  final String pdfUrl;
-
-  const _PdfViewerPage({required this.pdfUrl});
-
-  @override
-  State<_PdfViewerPage> createState() => _PdfViewerPageState();
-}
-
-class _PdfViewerPageState extends State<_PdfViewerPage> {
-  InAppWebViewController? _webViewController;
-  double _loadingProgress = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
-      appBar: AppBar(
-        backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
-        elevation: 0,
-        leading: AppBackButton(),
-        leadingWidth: 60,
-        title: const Text(
-          'Invoice',
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          if (_loadingProgress < 1.0)
-            LinearProgressIndicator(
-              value: _loadingProgress,
-              backgroundColor: isDark ? AppColors.neutral800 : AppColors.neutral100,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary500),
-            ),
-          Expanded(
-            child: InAppWebView(
-              initialUrlRequest: URLRequest(url: WebUri(widget.pdfUrl)),
-              initialOptions: InAppWebViewGroupOptions(
-                crossPlatform: InAppWebViewOptions(
-                  useShouldOverrideUrlLoading: true,
-                  mediaPlaybackRequiresUserGesture: false,
-                  allowFileAccessFromFileURLs: true,
-                  allowUniversalAccessFromFileURLs: true,
+    scaffoldMessenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
                 ),
               ),
-              onWebViewCreated: (controller) {
-                _webViewController = controller;
-              },
-              onLoadStart: (controller, url) {},
-              onLoadStop: (controller, url) {},
-              onProgressChanged: (controller, progress) {
-                setState(() {
-                  _loadingProgress = progress / 100;
-                });
-              },
-              shouldOverrideUrlLoading: (controller, navigationAction) async {
-                return NavigationActionPolicy.ALLOW;
-              },
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(l10n.accountDownloadWillStartShortly),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 30),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+    try {
+      final token = await AuthStorage.getToken();
+      if (token == null || token.isEmpty) {
+        throw const _InvoiceDownloadException('Missing customer access token');
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final invoiceNumber = (widget.invoice.incrementId ??
+              widget.invoice.numericId?.toString() ??
+              'invoice')
+          .replaceAll(RegExp(r'[^\w\-]'), '_');
+      final savePath = '${dir.path}/invoice-$invoiceNumber.pdf';
+      final resolvedDownloadUrl = _buildInvoiceDownloadUrl();
+      final requestHeaders = <String, String>{
+        'Authorization': 'Bearer $token',
+        'X-STOREFRONT-KEY': storefrontKey,
+      };
+
+      _logInvoiceDownload('═══════════════════════════════════════════');
+      _logInvoiceDownload('🧾 [Invoice Download Request]');
+      _logInvoiceDownload('🔗 URL: $resolvedDownloadUrl');
+      _logInvoiceDownload('🧾 Invoice ID: ${widget.invoice.id}');
+      _logInvoiceDownload('🧾 Invoice Number: ${widget.invoice.invoiceNumber}');
+      _logInvoiceDownload('💾 Save Path: $savePath');
+      _logInvoiceDownload(
+        '📋 Headers: ${_maskSensitiveHeaders(requestHeaders)}',
+      );
+
+      final dio = Dio();
+      final response = await dio.download(
+        resolvedDownloadUrl,
+        savePath,
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveDataWhenStatusError: true,
+          headers: requestHeaders,
+          followRedirects: true,
+        ),
+      );
+
+      final statusCode = response.statusCode ?? 0;
+      _logInvoiceDownload('✅ [Invoice Download Response]');
+      _logInvoiceDownload('🔢 Status Code: $statusCode');
+      _logInvoiceDownload('📋 Response Headers: ${response.headers.map}');
+      _logInvoiceDownload('📍 Real URI: ${response.realUri}');
+      _logInvoiceDownload('═══════════════════════════════════════════');
+
+      if (statusCode < 200 || statusCode >= 300) {
+        throw DioException.badResponse(
+          statusCode: statusCode,
+          requestOptions: response.requestOptions,
+          response: response,
+        );
+      }
+
+      if (!mounted) return;
+
+      setState(() => _isDownloading = false);
+
+      if (!context.mounted) return;
+
+      scaffoldMessenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '${l10n.accountInvoice} ${widget.invoice.invoiceNumber} downloaded',
+            ),
+            backgroundColor: AppColors.success500,
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'Open',
+              textColor: Colors.white,
+              onPressed: () => OpenFilex.open(savePath),
             ),
           ),
-        ],
-      ),
-    );
+        );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+
+      if (!context.mounted) return;
+
+      final message = e is DioException
+          ? _dioErrorMessage(e)
+          : e is _InvoiceDownloadException
+              ? e.message
+              : e.toString();
+
+      scaffoldMessenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $message'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
   }
+
+  String _buildInvoiceDownloadUrl() {
+    final directDownloadUrl = widget.downloadUrl.trim();
+    if (directDownloadUrl.isNotEmpty) {
+      return _resolveDownloadUrl(directDownloadUrl);
+    }
+
+    final numericId = widget.invoice.numericId;
+    if (numericId != null) {
+      final origin = Uri.parse(bagistoEndpoint).origin;
+      return '$origin/api/shop/customer-invoices/$numericId/pdf';
+    }
+
+    return directDownloadUrl;
+  }
+
+  String _resolveDownloadUrl(String downloadUrl) {
+    final uri = Uri.tryParse(downloadUrl);
+    if (uri == null) {
+      return downloadUrl;
+    }
+
+    if (uri.hasScheme && uri.host.isNotEmpty) {
+      return downloadUrl;
+    }
+
+    final baseUri = Uri.parse(bagistoEndpoint);
+    return baseUri.resolveUri(uri).toString();
+  }
+
+  String _dioErrorMessage(DioException error) {
+    final statusCode = error.response?.statusCode;
+    final responseData = error.response?.data;
+
+    _logInvoiceDownload('❌ [Invoice Download Error]');
+    _logInvoiceDownload('🔗 URL: ${error.requestOptions.uri}');
+    _logInvoiceDownload(
+      '📋 Request Headers: ${_maskSensitiveHeaders(error.requestOptions.headers)}',
+    );
+    _logInvoiceDownload('🔢 Status Code: $statusCode');
+    _logInvoiceDownload('📋 Response Headers: ${error.response?.headers.map}');
+    _logInvoiceDownload('📦 Response Body: ${_truncateForLog(responseData)}');
+    _logInvoiceDownload('⚠️ Dio Message: ${error.message}');
+    _logInvoiceDownload('═══════════════════════════════════════════');
+
+    if (statusCode == 401) {
+      return 'Unauthorized. Please log in again.';
+    }
+
+    if (statusCode == 403) {
+      return 'You cannot download this invoice.';
+    }
+
+    if (statusCode == 429) {
+      return 'Rate limit exceeded. Please wait a moment and try again.';
+    }
+
+    if (responseData is Map<String, dynamic>) {
+      final message = responseData['message']?.toString();
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
+    }
+
+    return error.message ?? 'Unknown error';
+  }
+
+  Map<String, dynamic> _maskSensitiveHeaders(Map<dynamic, dynamic> headers) {
+    return headers.map((key, value) {
+      final headerKey = key.toString();
+      final lowerKey = headerKey.toLowerCase();
+      if (lowerKey == 'authorization') {
+        return MapEntry(headerKey, _maskBearerToken(value?.toString() ?? ''));
+      }
+      if (lowerKey == 'x-storefront-key') {
+        return MapEntry(headerKey, _maskValue(value?.toString() ?? ''));
+      }
+      return MapEntry(headerKey, value);
+    });
+  }
+
+  String _maskBearerToken(String rawValue) {
+    if (!rawValue.startsWith('Bearer ')) {
+      return _maskValue(rawValue);
+    }
+
+    final token = rawValue.substring(7);
+    return 'Bearer ${_maskValue(token)}';
+  }
+
+  String _maskValue(String value) {
+    if (value.length <= 8) {
+      return '***';
+    }
+
+    return '${value.substring(0, 4)}***${value.substring(value.length - 4)}';
+  }
+
+  String _truncateForLog(dynamic data) {
+    final text = data?.toString() ?? 'null';
+    if (text.length <= 1500) {
+      return text;
+    }
+
+    return '${text.substring(0, 1500)}...';
+  }
+
+  void _logInvoiceDownload(String message) {
+    debugPrint(message);
+    // ignore: avoid_print
+    print(message);
+  }
+}
+
+class _InvoiceDownloadException implements Exception {
+  final String message;
+
+  const _InvoiceDownloadException(this.message);
 }

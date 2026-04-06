@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/home_models.dart';
 
 /// Horizontal scrollable category carousel with circular images and labels.
@@ -31,7 +32,9 @@ class CategoryCarousel extends StatelessWidget {
           return _CategoryItem(
             key: ValueKey('cat_${category.id}'),
             category: category,
-            onTap: onCategoryTap != null ? () => onCategoryTap!(category) : null,
+            onTap: onCategoryTap != null
+                ? () => onCategoryTap!(category)
+                : null,
           );
         },
       ),
@@ -43,18 +46,15 @@ class _CategoryItem extends StatelessWidget {
   final HomeCategory category;
   final VoidCallback? onTap;
 
-  const _CategoryItem({
-    super.key,
-    required this.category,
-    this.onTap,
-  });
+  const _CategoryItem({super.key, required this.category, this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Semantics(
       button: true,
-      label: '${category.name} category',
+      label: l10n.homeCategorySemanticLabel(category.name),
       child: GestureDetector(
         onTap: onTap,
         child: SizedBox(

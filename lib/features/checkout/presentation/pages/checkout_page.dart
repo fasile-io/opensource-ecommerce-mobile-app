@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/currency/currency_formatter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/selection_sheet.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../cart/data/models/cart_model.dart';
 import '../../../cart/presentation/bloc/cart_bloc.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -121,6 +123,14 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
   CheckoutAddress? _selectedBillingAddress;
   CheckoutAddress? _selectedShippingAddress;
 
+  bool _isGuestCheckout(BuildContext context, CartState cartState) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated && authState.token.isNotEmpty) {
+      return false;
+    }
+    return cartState.isGuest;
+  }
+
   @override
   void dispose() {
     _couponController.dispose();
@@ -149,61 +159,81 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocConsumer<CheckoutBloc, CheckoutState>(
-      listener: (context, state) {
-        if (state.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.errorMessage!),
-              backgroundColor: Colors.red,
-            ),
-          );
-          context.read<CheckoutBloc>().add(ClearCheckoutMessage());
-        }
-        if (state.successMessage != null &&
-            state.status == CheckoutStatus.orderPlaced) {
-          // Reload cart after successful order
-          context.read<CartBloc>().add(LoadCart());
-          // Navigate to Thank You page (replaces checkout in the stack)
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => ThankyouPage(
-                orderId: state.orderResponse?.orderId,
-                orderIncrementId: state.orderResponse?.orderIncrementId,
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<CartBloc, CartState>(
+          listenWhen: (previous, current) =>
+              previous.cart != current.cart &&
+              current.status == CartStatus.loaded,
+          listener: (context, cartState) {
+            final checkoutBloc = context.read<CheckoutBloc>();
+            final checkoutState = checkoutBloc.state;
+            if (checkoutState.cart == cartState.cart) return;
+
+            checkoutBloc.add(
+              InitCheckout(
+                cart: cartState.cart,
+                isGuest: _isGuestCheckout(context, cartState),
               ),
-            ),
-          );
-        }
-        // Sync local address selections with bloc state
-        if (state.selectedAddress != null && _selectedBillingAddress == null) {
-          _selectedBillingAddress = state.selectedAddress;
-        }
-        // Reset local selections when bloc resets downstream state
-        if (!state.addressConfirmed) {
-          _selectedShippingMethod = null;
-          _selectedPaymentMethod = null;
-        }
-        // Sync local shipping method selection with bloc state (for auto-select)
-        if (state.selectedShippingMethod != null &&
-            _selectedShippingMethod == null) {
-          _selectedShippingMethod = state.selectedShippingMethod;
-        }
-        // Sync local payment method selection with bloc state
-        if (state.selectedPaymentMethod != null &&
-            _selectedPaymentMethod == null) {
-          _selectedPaymentMethod = state.selectedPaymentMethod;
-        }
-        if (state.selectedShippingMethod == null) {
-          _selectedShippingMethod = null;
-        }
-        if (state.selectedPaymentMethod == null) {
-          _selectedPaymentMethod = null;
-        }
-      },
-      builder: (context, state) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final cart = state.cart;
-        return Scaffold(
+            );
+          },
+        ),
+      ],
+      child: BlocConsumer<CheckoutBloc, CheckoutState>(
+        listener: (context, state) {
+          if (state.errorMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.errorMessage!),
+                backgroundColor: Colors.red,
+              ),
+            );
+            context.read<CheckoutBloc>().add(ClearCheckoutMessage());
+          }
+          if (state.successMessage != null &&
+              state.status == CheckoutStatus.orderPlaced) {
+            // Reload cart after successful order
+            context.read<CartBloc>().add(LoadCart());
+            // Navigate to Thank You page (replaces checkout in the stack)
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => ThankyouPage(
+                  orderId: state.orderResponse?.orderId,
+                  orderIncrementId: state.orderResponse?.orderIncrementId,
+                ),
+              ),
+            );
+          }
+          // Sync local address selections with bloc state
+          if (state.selectedAddress != null && _selectedBillingAddress == null) {
+            _selectedBillingAddress = state.selectedAddress;
+          }
+          // Reset local selections when bloc resets downstream state
+          if (!state.addressConfirmed) {
+            _selectedShippingMethod = null;
+            _selectedPaymentMethod = null;
+          }
+          // Sync local shipping method selection with bloc state (for auto-select)
+          if (state.selectedShippingMethod != null &&
+              _selectedShippingMethod == null) {
+            _selectedShippingMethod = state.selectedShippingMethod;
+          }
+          // Sync local payment method selection with bloc state
+          if (state.selectedPaymentMethod != null &&
+              _selectedPaymentMethod == null) {
+            _selectedPaymentMethod = state.selectedPaymentMethod;
+          }
+          if (state.selectedShippingMethod == null) {
+            _selectedShippingMethod = null;
+          }
+          if (state.selectedPaymentMethod == null) {
+            _selectedPaymentMethod = null;
+          }
+        },
+        builder: (context, state) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final cart = state.cart;
+          return Scaffold(
           backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
           body: SafeArea(
             bottom: false,
@@ -223,8 +253,8 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                           child: _buildBillingSection(context, state),
                         ),
                         const SizedBox(height: 16),
-                        // Shipping Address (only when NOT using same address)
-                        if (!_useSameAddress) ...[
+                        // Shipping Address (only when NOT using same address and NOT virtual only)
+                        if (!_useSameAddress && !state.isVirtualOnly) ...[
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: _buildShippingAddressSection(context, state),
@@ -237,12 +267,14 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                           child: _buildCartItemsSection(context, cart),
                         ),
                         const SizedBox(height: 16),
-                        // Shipping Method
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildShippingMethodSection(context, state),
-                        ),
-                        const SizedBox(height: 8),
+                        // Shipping Method (only when NOT virtual only)
+                        if (!state.isVirtualOnly) ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _buildShippingMethodSection(context, state),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                         // Payment Method
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -269,8 +301,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
               ],
             ),
           ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -305,7 +338,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                'Checkout',
+                AppLocalizations.of(context)!.checkout,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -336,11 +369,11 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       return _buildAddressCard(
         context: context,
         state: state,
-        label: 'Billing to',
+        label: AppLocalizations.of(context)!.checkoutBillingTo,
         address: state.selectedAddress!,
         onChangePressed: () =>
             _showChangeAddressFlow(context, state, isBilling: true),
-        showSameAddressCheckbox: true,
+        showSameAddressCheckbox: !state.isVirtualOnly,
       );
     }
 
@@ -356,17 +389,17 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
         return _buildAddressCardWithConfirm(
           context: context,
           state: state,
-          label: 'Billing to',
+          label: AppLocalizations.of(context)!.checkoutBillingTo,
           address: displayAddr,
           onChangePressed: () =>
               _showAddressSelectionSheet(context, state, isBilling: true),
-          showSameAddressCheckbox: true,
+          showSameAddressCheckbox: !state.isVirtualOnly,
         );
       }
       return _buildSelectAddressPrompt(
         context,
         state,
-        label: 'Select Billing Address',
+        label: AppLocalizations.of(context)!.checkoutSelectBillingAddress,
         onTap: () =>
             _showAddressSelectionSheet(context, state, isBilling: true),
       );
@@ -396,7 +429,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       return _buildAddressCard(
         context: context,
         state: state,
-        label: 'Delivered to',
+        label: AppLocalizations.of(context)!.checkoutDeliveredTo,
         address: displayAddr,
         onChangePressed: () =>
             _showAddressSelectionSheet(context, state, isBilling: false),
@@ -451,7 +484,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           ),
           if (showSameAddressCheckbox) ...[
             const SizedBox(height: 10),
-            Container(height: 1, color: isDark ? AppColors.neutral700 : AppColors.white),
+            Container(
+              height: 1,
+              color: isDark ? AppColors.neutral700 : AppColors.white,
+            ),
             const SizedBox(height: 10),
             _buildSameAddressCheckbox(context),
           ],
@@ -502,7 +538,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           if (address.phone != null && address.phone!.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              'Phone: ${address.phone}',
+              AppLocalizations.of(context)!.checkoutPhoneValue(address.phone!),
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 13,
@@ -512,7 +548,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           ],
           if (showSameAddressCheckbox) ...[
             const SizedBox(height: 10),
-            Container(height: 1, color: isDark ? AppColors.neutral700 : AppColors.white),
+            Container(
+              height: 1,
+              color: isDark ? AppColors.neutral700 : AppColors.white,
+            ),
             const SizedBox(height: 10),
             _buildSameAddressCheckbox(context),
           ],
@@ -553,9 +592,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
         ),
         GestureDetector(
           onTap: onChangePressed,
-          child: const Text(
-            'Change',
-            style: TextStyle(
+          child: Text(
+            AppLocalizations.of(context)!.checkoutChange,
+            style: const TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w600,
               fontSize: 14,
@@ -589,20 +628,23 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
   }
 
   String _getAddressTypeChip(CheckoutAddress address) {
+    final l10n = AppLocalizations.of(context)!;
     final type = address.addressType.toLowerCase();
-    if (type.contains('office') || type.contains('work')) return 'Office';
-    if (type.contains('home')) return 'Home';
+    if (type.contains('office') || type.contains('work')) {
+      return l10n.checkoutAddressTypeOffice;
+    }
+    if (type.contains('home')) return l10n.checkoutAddressTypeHome;
     if (type.contains('billing') || type.contains('cart_billing')) {
-      return 'Billing';
+      return l10n.checkoutAddressTypeBilling;
     }
     if (type.contains('shipping') || type.contains('cart_shipping')) {
-      return 'Shipping';
+      return l10n.checkoutAddressTypeShipping;
     }
-    if (address.defaultAddress) return 'Default';
+    if (address.defaultAddress) return l10n.checkoutAddressTypeDefault;
     if (address.companyName != null && address.companyName!.isNotEmpty) {
-      return 'Office';
+      return l10n.checkoutAddressTypeOffice;
     }
-    return 'Home';
+    return l10n.checkoutAddressTypeHome;
   }
 
   Widget _buildSelectAddressPrompt(
@@ -639,7 +681,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, color: isDark ? AppColors.neutral500 : AppColors.neutral400),
+            Icon(
+              Icons.chevron_right,
+              color: isDark ? AppColors.neutral500 : AppColors.neutral400,
+            ),
           ],
         ),
       ),
@@ -686,20 +731,28 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.neutral700 : AppColors.neutral300,
+                        color: isDark
+                            ? AppColors.neutral700
+                            : AppColors.neutral300,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
                   Text(
                     isBilling
-                        ? 'Select Billing Address'
-                        : 'Select Shipping Address',
+                        ? AppLocalizations.of(
+                            context,
+                          )!.checkoutSelectBillingAddress
+                        : AppLocalizations.of(
+                            context,
+                          )!.checkoutSelectShippingAddress,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
-                      color: isDark ? AppColors.neutral100 : AppColors.neutral900,
+                      color: isDark
+                          ? AppColors.neutral100
+                          : AppColors.neutral900,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -730,11 +783,15 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? AppColors.primary500.withValues(alpha: 0.05)
-                                  : (isDark ? AppColors.neutral800 : AppColors.neutral100),
+                                  : (isDark
+                                        ? AppColors.neutral800
+                                        : AppColors.neutral100),
                               border: Border.all(
                                 color: isSelected
                                     ? AppColors.primary500
-                                    : (isDark ? AppColors.neutral700 : AppColors.neutral200),
+                                    : (isDark
+                                          ? AppColors.neutral700
+                                          : AppColors.neutral200),
                                 width: isSelected ? 2 : 1,
                               ),
                               borderRadius: BorderRadius.circular(10),
@@ -753,7 +810,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                                           fontSize: 14,
                                           color: isSelected
                                               ? AppColors.primary500
-                                              : (isDark ? AppColors.neutral100 : AppColors.neutral900),
+                                              : (isDark
+                                                    ? AppColors.neutral100
+                                                    : AppColors.neutral900),
                                         ),
                                       ),
                                     ),
@@ -766,18 +825,24 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                                   style: TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 13,
-                                    color: isDark ? AppColors.neutral400 : AppColors.neutral800,
+                                    color: isDark
+                                        ? AppColors.neutral400
+                                        : AppColors.neutral800,
                                   ),
                                 ),
                                 if (addr.phone != null &&
                                     addr.phone!.isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Phone: ${addr.phone}',
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.checkoutPhoneValue(addr.phone!),
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 12,
-                                      color: isDark ? AppColors.neutral500 : AppColors.neutral500,
+                                      color: isDark
+                                          ? AppColors.neutral500
+                                          : AppColors.neutral500,
                                     ),
                                   ),
                                 ],
@@ -828,7 +893,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              state.isGuest ? 'Billing Address' : 'Enter Address',
+              state.isGuest
+                  ? AppLocalizations.of(context)!.checkoutBillingAddress
+                  : AppLocalizations.of(context)!.checkoutEnterAddress,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w600,
@@ -842,7 +909,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _billingFirstNameCtrl,
-                    'First Name',
+                    AppLocalizations.of(context)!.checkoutFirstName,
                     required: true,
                   ),
                 ),
@@ -850,7 +917,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _billingLastNameCtrl,
-                    'Last Name',
+                    AppLocalizations.of(context)!.checkoutLastName,
                     required: true,
                   ),
                 ),
@@ -859,21 +926,21 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             const SizedBox(height: 12),
             _buildTextField(
               _billingEmailCtrl,
-              'Email',
+              AppLocalizations.of(context)!.checkoutEmail,
               keyboardType: TextInputType.emailAddress,
               required: true,
             ),
             const SizedBox(height: 12),
             _buildTextField(
               _billingPhoneCtrl,
-              'Phone',
+              AppLocalizations.of(context)!.checkoutPhone,
               keyboardType: TextInputType.phone,
               required: true,
             ),
             const SizedBox(height: 12),
             _buildTextField(
               _billingAddressCtrl,
-              'Street Address',
+              AppLocalizations.of(context)!.checkoutStreetAddress,
               required: true,
             ),
             const SizedBox(height: 12),
@@ -929,7 +996,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _billingCityCtrl,
-                    'City',
+                    AppLocalizations.of(context)!.checkoutCity,
                     required: true,
                   ),
                 ),
@@ -937,14 +1004,17 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _billingPostcodeCtrl,
-                    'Postcode',
+                    AppLocalizations.of(context)!.checkoutPostcode,
                     required: true,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _buildTextField(_billingCompanyCtrl, 'Company (Optional)'),
+            _buildTextField(
+              _billingCompanyCtrl,
+              AppLocalizations.of(context)!.checkoutCompanyOptional,
+            ),
             const SizedBox(height: 12),
             _buildSameAddressCheckbox(context),
             const SizedBox(height: 16),
@@ -975,7 +1045,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             Row(
               children: [
                 Text(
-                  'Delivered to',
+                  AppLocalizations.of(context)!.checkoutDeliveredTo,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w400,
@@ -984,7 +1054,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                _buildGreenChip('Shipping'),
+                _buildGreenChip(
+                  AppLocalizations.of(context)!.checkoutAddressTypeShipping,
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -993,7 +1065,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _shippingFirstNameCtrl,
-                    'First Name',
+                    AppLocalizations.of(context)!.checkoutFirstName,
                     required: true,
                   ),
                 ),
@@ -1001,7 +1073,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _shippingLastNameCtrl,
-                    'Last Name',
+                    AppLocalizations.of(context)!.checkoutLastName,
                     required: true,
                   ),
                 ),
@@ -1010,21 +1082,21 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             const SizedBox(height: 12),
             _buildTextField(
               _shippingEmailCtrl,
-              'Email',
+              AppLocalizations.of(context)!.checkoutEmail,
               keyboardType: TextInputType.emailAddress,
               required: true,
             ),
             const SizedBox(height: 12),
             _buildTextField(
               _shippingPhoneCtrl,
-              'Phone',
+              AppLocalizations.of(context)!.checkoutPhone,
               keyboardType: TextInputType.phone,
               required: true,
             ),
             const SizedBox(height: 12),
             _buildTextField(
               _shippingAddressCtrl,
-              'Street Address',
+              AppLocalizations.of(context)!.checkoutStreetAddress,
               required: true,
             ),
             const SizedBox(height: 12),
@@ -1080,7 +1152,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _shippingCityCtrl,
-                    'City',
+                    AppLocalizations.of(context)!.checkoutCity,
                     required: true,
                   ),
                 ),
@@ -1088,14 +1160,17 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 Expanded(
                   child: _buildTextField(
                     _shippingPostcodeCtrl,
-                    'Postcode',
+                    AppLocalizations.of(context)!.checkoutPostcode,
                     required: true,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            _buildTextField(_shippingCompanyCtrl, 'Company (Optional)'),
+            _buildTextField(
+              _shippingCompanyCtrl,
+              AppLocalizations.of(context)!.checkoutCompanyOptional,
+            ),
           ],
         ),
       ),
@@ -1117,7 +1192,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       controller: ctrl,
       keyboardType: keyboardType,
       validator: required
-          ? (v) => (v == null || v.trim().isEmpty) ? '$label is required' : null
+          ? (v) => (v == null || v.trim().isEmpty)
+                ? AppLocalizations.of(context)!.checkoutFieldRequired(label)
+                : null
           : null,
       decoration: InputDecoration(
         labelText: label,
@@ -1172,7 +1249,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           : () async {
               final selected = await SelectionSheet.show<BagistoCountry>(
                 context: context,
-                title: 'Select Country',
+                title: AppLocalizations.of(context)!.checkoutSelectCountry,
                 items: countries,
                 selectedItem: selectedCountry,
                 itemLabel: (c) => c.name,
@@ -1188,10 +1265,11 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
         child: TextFormField(
           controller: displayCtrl,
           readOnly: true,
-          validator: (v) =>
-              (v == null || v.trim().isEmpty) ? 'Country is required' : null,
+          validator: (v) => (v == null || v.trim().isEmpty)
+              ? AppLocalizations.of(context)!.checkoutCountryRequired
+              : null,
           decoration: InputDecoration(
-            labelText: 'Country',
+            labelText: AppLocalizations.of(context)!.checkoutCountry,
             labelStyle: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
@@ -1262,16 +1340,19 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
         readOnly: !hasCountry || isLoading,
         enabled: hasCountry,
         onChanged: onManualChanged,
-        validator: (v) =>
-            (v == null || v.trim().isEmpty) ? 'State is required' : null,
+        validator: (v) => (v == null || v.trim().isEmpty)
+            ? AppLocalizations.of(context)!.checkoutStateRequired
+            : null,
         decoration: InputDecoration(
-          labelText: 'State',
+          labelText: AppLocalizations.of(context)!.checkoutState,
           labelStyle: TextStyle(
             fontFamily: 'Roboto',
             fontSize: 14,
             color: isDark ? AppColors.neutral500 : AppColors.neutral400,
           ),
-          hintText: !hasCountry ? 'Select country first' : null,
+          hintText: !hasCountry
+              ? AppLocalizations.of(context)!.checkoutSelectCountryFirst
+              : null,
           hintStyle: TextStyle(
             fontFamily: 'Roboto',
             fontSize: 14,
@@ -1301,7 +1382,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
               color: isDark ? AppColors.neutral700 : AppColors.neutral200,
             ),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
           isDense: true,
           suffixIcon: isLoading
               ? const Padding(
@@ -1331,7 +1415,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           : () async {
               final selected = await SelectionSheet.show<BagistoCountryState>(
                 context: context,
-                title: 'Select State',
+                title: AppLocalizations.of(context)!.checkoutSelectState,
                 items: states,
                 selectedItem: selectedState,
                 itemLabel: (s) => s.defaultName,
@@ -1351,16 +1435,19 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
               controller: displayCtrl,
               readOnly: true,
               enabled: hasCountry && !isLoading,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'State is required' : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? AppLocalizations.of(context)!.checkoutStateRequired
+                  : null,
               decoration: InputDecoration(
-                labelText: 'State',
+                labelText: AppLocalizations.of(context)!.checkoutState,
                 labelStyle: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
                   color: isDark ? AppColors.neutral500 : AppColors.neutral400,
                 ),
-                hintText: !hasCountry ? 'Select country first' : null,
+                hintText: !hasCountry
+                    ? AppLocalizations.of(context)!.checkoutSelectCountryFirst
+                    : null,
                 hintStyle: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
@@ -1409,7 +1496,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                       )
                     : Icon(
                         Icons.keyboard_arrow_down,
-                        color: isDark ? AppColors.neutral500 : AppColors.neutral800,
+                        color: isDark
+                            ? AppColors.neutral500
+                            : AppColors.neutral800,
                       ),
               ),
               style: TextStyle(
@@ -1454,7 +1543,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   : Container(
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: isDark ? AppColors.neutral500 : AppColors.neutral400,
+                          color: isDark
+                              ? AppColors.neutral500
+                              : AppColors.neutral400,
                           width: 2,
                         ),
                         borderRadius: BorderRadius.circular(4),
@@ -1463,7 +1554,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             ),
             const SizedBox(width: 4),
             Text(
-              ' Use same address for shipping? ',
+              ' ' +
+                  AppLocalizations.of(context)!.checkoutUseSameAddressShipping +
+                  ' ',
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -1497,9 +1590,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                     color: AppColors.white,
                   ),
                 )
-              : const Text(
-                  'Save & Continue',
-                  style: TextStyle(
+              : Text(
+                  AppLocalizations.of(context)!.checkoutSaveContinue,
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -1600,9 +1693,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
     if (items.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(16),
-        child: const Center(
+        child: Center(
           child: Text(
-            'Your cart is empty',
+            AppLocalizations.of(context)!.checkoutYourCartEmpty,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
@@ -1617,7 +1710,12 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${items.length} Item${items.length > 1 ? 's' : ''} in the Cart',
+          AppLocalizations.of(context)!.cartItemsInCart(
+            items.length,
+            items.length == 1
+                ? AppLocalizations.of(context)!.cartUnit
+                : AppLocalizations.of(context)!.cartUnits,
+          ),
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w500,
@@ -1631,9 +1729,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           return _buildCartItemWidget(
             imageUrl: item.imageUrl,
             name: item.name,
-            pricePerUnit: '\$${item.price.toStringAsFixed(2)}',
+            pricePerUnit: item.displayPrice,
             quantity: item.quantity,
-            totalPrice: '\$${item.totalPrice.toStringAsFixed(2)}',
+            isBooking: item.isBooking,
+            totalPrice: item.displayTotal,
             showBorder: idx < items.length - 1,
           );
         }),
@@ -1646,6 +1745,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
     required String name,
     required String pricePerUnit,
     required int quantity,
+    required bool isBooking,
     required String totalPrice,
     required bool showBorder,
   }) {
@@ -1655,7 +1755,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       decoration: BoxDecoration(
         border: showBorder
             ? Border(
-                bottom: BorderSide(color: isDark ? AppColors.neutral700 : AppColors.neutral200, width: 1),
+                bottom: BorderSide(
+                  color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+                  width: 1,
+                ),
               )
             : null,
       ),
@@ -1670,21 +1773,32 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   ? CachedNetworkImage(
                       imageUrl: imageUrl,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) =>
-                          Container(color: isDark ? AppColors.neutral700 : AppColors.neutral200),
+                      placeholder: (_, __) => Container(
+                        color: isDark
+                            ? AppColors.neutral700
+                            : AppColors.neutral200,
+                      ),
                       errorWidget: (_, __, ___) => Container(
-                        color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+                        color: isDark
+                            ? AppColors.neutral700
+                            : AppColors.neutral200,
                         child: Icon(
                           Icons.image,
-                          color: isDark ? AppColors.neutral500 : AppColors.neutral400,
+                          color: isDark
+                              ? AppColors.neutral500
+                              : AppColors.neutral400,
                         ),
                       ),
                     )
                   : Container(
-                      color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+                      color: isDark
+                          ? AppColors.neutral700
+                          : AppColors.neutral200,
                       child: Icon(
                         Icons.image,
-                        color: isDark ? AppColors.neutral500 : AppColors.neutral400,
+                        color: isDark
+                            ? AppColors.neutral500
+                            : AppColors.neutral400,
                         size: 30,
                       ),
                     ),
@@ -1711,12 +1825,16 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '$pricePerUnit x $quantity Units',
+                      isBooking
+                          ? '$pricePerUnit x N/A'
+                          : '$pricePerUnit x $quantity ${quantity == 1 ? AppLocalizations.of(context)!.cartUnit : AppLocalizations.of(context)!.cartUnits}',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w400,
                         fontSize: 14,
-                        color: isDark ? AppColors.neutral300 : AppColors.neutral900,
+                        color: isDark
+                            ? AppColors.neutral300
+                            : AppColors.neutral900,
                       ),
                     ),
                     Text(
@@ -1725,7 +1843,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
-                        color: isDark ? AppColors.neutral100 : AppColors.neutral900,
+                        color: isDark
+                            ? AppColors.neutral100
+                            : AppColors.neutral900,
                       ),
                     ),
                   ],
@@ -1758,7 +1878,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Shipping Method',
+              AppLocalizations.of(context)!.checkoutShippingMethod,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -1772,7 +1892,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
               decoration: BoxDecoration(
                 color: isDark ? AppColors.neutral900 : AppColors.white,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: isDark ? AppColors.neutral700 : AppColors.neutral200),
+                border: Border.all(
+                  color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+                ),
               ),
               child: Row(
                 children: [
@@ -1783,17 +1905,21 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-  child: Text(
-    'Save your address to see shipping options',
-    style: TextStyle(
-      fontFamily: 'Roboto',
-      fontSize: 13,
-      color: isDark ? AppColors.neutral500 : AppColors.neutral400,
-    ),
-    overflow: TextOverflow.ellipsis,
-    maxLines: 2,
-  ),
-),
+                    child: Text(
+                      AppLocalizations.of(
+                        context,
+                      )!.checkoutSaveAddressSeeShipping,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        color: isDark
+                            ? AppColors.neutral500
+                            : AppColors.neutral400,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1814,7 +1940,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Shipping Method',
+              AppLocalizations.of(context)!.checkoutShippingMethod,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -1847,7 +1973,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Shipping Method',
+                AppLocalizations.of(context)!.checkoutShippingMethod,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w400,
@@ -1886,7 +2012,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
 
   Widget _buildPaymentMethodSection(BuildContext context, CheckoutState state) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (state.selectedShippingMethod == null) {
+    if (!state.isVirtualOnly && state.selectedShippingMethod == null) {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -1897,7 +2023,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Payment Method',
+              AppLocalizations.of(context)!.checkoutPaymentMethod,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -1911,7 +2037,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
               decoration: BoxDecoration(
                 color: isDark ? AppColors.neutral900 : AppColors.white,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: isDark ? AppColors.neutral700 : AppColors.neutral200),
+                border: Border.all(
+                  color: isDark ? AppColors.neutral700 : AppColors.neutral200,
+                ),
               ),
               child: Row(
                 children: [
@@ -1922,11 +2050,15 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Select a shipping method first',
+                    AppLocalizations.of(
+                      context,
+                    )!.checkoutSelectShippingMethodFirst,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 13,
-                      color: isDark ? AppColors.neutral500 : AppColors.neutral400,
+                      color: isDark
+                          ? AppColors.neutral500
+                          : AppColors.neutral400,
                     ),
                   ),
                 ],
@@ -1949,7 +2081,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Payment Method',
+              AppLocalizations.of(context)!.checkoutPaymentMethod,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -1982,7 +2114,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Payment Method ',
+                AppLocalizations.of(context)!.checkoutPaymentMethod,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w400,
@@ -2226,7 +2358,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: isDark ? AppColors.neutral600 : AppColors.neutral400, width: 2),
+        border: Border.all(
+          color: isDark ? AppColors.neutral600 : AppColors.neutral400,
+          width: 2,
+        ),
       ),
     );
   }
@@ -2241,7 +2376,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Apply Coupon',
+          AppLocalizations.of(context)!.cartApplyCoupon,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -2265,7 +2400,11 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                     ),
                     decoration: BoxDecoration(
                       color: isDark ? AppColors.neutral800 : AppColors.white,
-                      border: Border.all(color: isDark ? AppColors.neutral700 : AppColors.neutral200),
+                      border: Border.all(
+                        color: isDark
+                            ? AppColors.neutral700
+                            : AppColors.neutral200,
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
@@ -2274,12 +2413,16 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                           child: TextField(
                             controller: _couponController,
                             decoration: InputDecoration(
-                              hintText: 'Enter your coupon code',
+                              hintText: AppLocalizations.of(
+                                context,
+                              )!.checkoutEnterCouponCode,
                               hintStyle: TextStyle(
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w400,
                                 fontSize: 16,
-                                color: isDark ? AppColors.neutral500 : AppColors.neutral400,
+                                color: isDark
+                                    ? AppColors.neutral500
+                                    : AppColors.neutral400,
                               ),
                               border: InputBorder.none,
                               isDense: true,
@@ -2288,7 +2431,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                             style: TextStyle(
                               fontFamily: 'Roboto',
                               fontSize: 16,
-                              color: isDark ? AppColors.neutral100 : AppColors.neutral900,
+                              color: isDark
+                                  ? AppColors.neutral100
+                                  : AppColors.neutral900,
                             ),
                             onChanged: (_) => setState(() {}),
                           ),
@@ -2311,7 +2456,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                               child: Icon(
                                 Icons.close,
                                 size: 20,
-                                color: isDark ? AppColors.neutral300 : AppColors.neutral900,
+                                color: isDark
+                                    ? AppColors.neutral300
+                                    : AppColors.neutral900,
                               ),
                             ),
                           ),
@@ -2325,12 +2472,14 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                       color: isDark ? AppColors.neutral900 : AppColors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 2),
                       child: Text(
-                        'Coupon Code',
+                        AppLocalizations.of(context)!.cartCouponCode,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w400,
                           fontSize: 12,
-                          color: isDark ? AppColors.neutral400 : AppColors.neutral800,
+                          color: isDark
+                              ? AppColors.neutral400
+                              : AppColors.neutral800,
                         ),
                       ),
                     ),
@@ -2357,8 +2506,8 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   color: AppColors.primary500,
                   borderRadius: BorderRadius.circular(54),
                 ),
-                child: const Text(
-                  'Apply Coupon',
+                child: Text(
+                  AppLocalizations.of(context)!.cartApplyCoupon,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w700,
@@ -2381,26 +2530,29 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
   Widget _buildPriceBreakSection(BuildContext context, CartModel cart) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final subtotal = cart.subtotal > 0
-        ? '\$${_formatPrice(cart.subtotal)}'
-        : '\$0.00';
+        ? (cart.formattedSubtotal ?? CurrencyFormatter.formatAmount(cart.subtotal))
+        : CurrencyFormatter.formatAmount(0);
     final discount = cart.discountAmount > 0
-        ? '-\$${_formatPrice(cart.discountAmount)}'
-        : '\$0.00';
+        ? '-${cart.formattedDiscountAmount ?? CurrencyFormatter.formatAmount(cart.discountAmount)}'
+        : CurrencyFormatter.formatAmount(0);
     final shipping = cart.shippingAmount > 0
-        ? '\$${_formatPrice(cart.shippingAmount)}'
-        : '\$0.00';
+        ? (cart.formattedShippingAmount ??
+            CurrencyFormatter.formatAmount(cart.shippingAmount))
+        : CurrencyFormatter.formatAmount(0);
     final tax = cart.taxAmount > 0
-        ? '\$${_formatPrice(cart.taxAmount)}'
-        : '\$0.00';
+        ? (cart.formattedTaxAmount ??
+            CurrencyFormatter.formatAmount(cart.taxAmount))
+        : CurrencyFormatter.formatAmount(0);
     final grandTotal = cart.grandTotal > 0
-        ? '\$${_formatPrice(cart.grandTotal)}'
-        : '\$0.00';
+        ? (cart.formattedGrandTotal ??
+            CurrencyFormatter.formatAmount(cart.grandTotal))
+        : CurrencyFormatter.formatAmount(0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Price Break',
+          AppLocalizations.of(context)!.cartPriceBreak,
           style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w600,
@@ -2409,21 +2561,47 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildPriceRow('SubTotal', subtotal, isDark: isDark),
+        _buildPriceRow(
+          AppLocalizations.of(context)!.cartSubTotal,
+          subtotal,
+          isDark: isDark,
+        ),
         const SizedBox(height: 8),
-        _buildPriceRow('Discount (Coupon)', discount, isDark: isDark),
+        _buildPriceRow(
+          AppLocalizations.of(context)!.checkoutDiscountCoupon,
+          discount,
+          isDark: isDark,
+        ),
         const SizedBox(height: 8),
-        _buildPriceRow('Delivery Charges', shipping, isDark: isDark),
+        _buildPriceRow(
+          AppLocalizations.of(context)!.cartDeliveryCharges,
+          shipping,
+          isDark: isDark,
+        ),
         const SizedBox(height: 8),
-        _buildPriceRow('Tax', tax, isDark: isDark),
+        _buildPriceRow(
+          AppLocalizations.of(context)!.cartTax,
+          tax,
+          isDark: isDark,
+        ),
         const SizedBox(height: 8),
-        _buildPriceRow('Grand Total', grandTotal, isDark: isDark, isBold: true),
+        _buildPriceRow(
+          AppLocalizations.of(context)!.cartGrandTotal,
+          grandTotal,
+          isDark: isDark,
+          isBold: true,
+        ),
         const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildPriceRow(String label, String value, {bool isDark = false, bool isBold = false}) {
+  Widget _buildPriceRow(
+    String label,
+    String value, {
+    bool isDark = false,
+    bool isBold = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -2460,8 +2638,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final grandTotal = cart.grandTotal > 0
-        ? '\$${_formatPrice(cart.grandTotal)}'
-        : '\$0.00';
+        ? (cart.formattedGrandTotal ??
+            CurrencyFormatter.formatAmount(cart.grandTotal))
+        : CurrencyFormatter.formatAmount(0);
     final canPlace = state.canPlaceOrder;
 
     return Container(
@@ -2484,16 +2663,20 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
-                      color: isDark ? AppColors.neutral100 : AppColors.neutral800,
+                      color: isDark
+                          ? AppColors.neutral100
+                          : AppColors.neutral800,
                     ),
                   ),
                   Text(
-                    'Amount to be Paid',
+                    AppLocalizations.of(context)!.cartAmountToBePaid,
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
                       fontSize: 14,
-                      color: isDark ? AppColors.neutral400 : AppColors.neutral800,
+                      color: isDark
+                          ? AppColors.neutral400
+                          : AppColors.neutral800,
                     ),
                   ),
                 ],
@@ -2521,8 +2704,8 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                             color: AppColors.white,
                           ),
                         )
-                      : const Text(
-                          'Place Order',
+                      : Text(
+                          AppLocalizations.of(context)!.checkoutPlaceOrder,
                           style: TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w700,
@@ -2558,25 +2741,6 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
         ),
       ),
     );
-  }
-
-  String _formatPrice(double price) {
-    if (price >= 1000) {
-      final parts = price.toStringAsFixed(2).split('.');
-      final intPart = parts[0];
-      final decPart = parts[1];
-      final buffer = StringBuffer();
-      int count = 0;
-      for (int i = intPart.length - 1; i >= 0; i--) {
-        buffer.write(intPart[i]);
-        count++;
-        if (count % 3 == 0 && i > 0) {
-          buffer.write(',');
-        }
-      }
-      return '${buffer.toString().split('').reversed.join('')}.$decPart';
-    }
-    return price.toStringAsFixed(2);
   }
 
   // _showOrderSuccessDialog removed — navigation to ThankyouPage is

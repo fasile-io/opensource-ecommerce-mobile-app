@@ -65,7 +65,14 @@ class ReorderOrder extends OrderDetailEvent {
 
 // ─── STATE ───
 
-enum OrderDetailStatus { initial, loading, loaded, error, reordering, reorderSuccess }
+enum OrderDetailStatus {
+  initial,
+  loading,
+  loaded,
+  error,
+  reordering,
+  reorderSuccess,
+}
 
 class OrderDetailState extends Equatable {
   final OrderDetailStatus status;
@@ -111,7 +118,8 @@ class OrderDetailState extends Equatable {
       shipments: shipments ?? this.shipments,
       shipmentDetail: shipmentDetail ?? this.shipmentDetail,
       shipmentsLoading: shipmentsLoading ?? this.shipmentsLoading,
-      shipmentDetailLoading: shipmentDetailLoading ?? this.shipmentDetailLoading,
+      shipmentDetailLoading:
+          shipmentDetailLoading ?? this.shipmentDetailLoading,
       errorMessage: errorMessage,
       successMessage: successMessage,
       reorderItemsCount: reorderItemsCount,
@@ -119,7 +127,18 @@ class OrderDetailState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [status, order, invoices, shipments, shipmentDetail, shipmentsLoading, shipmentDetailLoading, errorMessage, successMessage, reorderItemsCount];
+  List<Object?> get props => [
+    status,
+    order,
+    invoices,
+    shipments,
+    shipmentDetail,
+    shipmentsLoading,
+    shipmentDetailLoading,
+    errorMessage,
+    successMessage,
+    reorderItemsCount,
+  ];
 }
 
 // ─── BLOC ───
@@ -128,7 +147,7 @@ class OrderDetailBloc extends Bloc<OrderDetailEvent, OrderDetailState> {
   final AccountRepository repository;
 
   OrderDetailBloc({required this.repository})
-      : super(const OrderDetailState()) {
+    : super(const OrderDetailState()) {
     on<LoadOrderDetail>(_onLoad);
     on<LoadOrderInvoices>(_onLoadInvoices);
     on<LoadOrderShipments>(_onLoadShipments);
@@ -149,18 +168,17 @@ class OrderDetailBloc extends Bloc<OrderDetailEvent, OrderDetailState> {
     try {
       final order = await repository.getCustomerOrder(event.orderId);
 
-      emit(state.copyWith(
-        status: OrderDetailStatus.loaded,
-        order: order,
-      ));
+      emit(state.copyWith(status: OrderDetailStatus.loaded, order: order));
     } catch (e) {
       debugPrint('❌ OrderDetailBloc._onLoad error: $e');
-      emit(state.copyWith(
-        status: OrderDetailStatus.error,
-        errorMessage: e is AccountException
-            ? e.message
-            : 'Failed to load order details',
-      ));
+      emit(
+        state.copyWith(
+          status: OrderDetailStatus.error,
+          errorMessage: e is AccountException
+              ? e.message
+              : 'Failed to load order details',
+        ),
+      );
     }
   }
 
@@ -174,9 +192,7 @@ class OrderDetailBloc extends Bloc<OrderDetailEvent, OrderDetailState> {
         orderId: event.orderId,
       );
 
-      emit(state.copyWith(
-        invoices: invoicesResult.invoices,
-      ));
+      emit(state.copyWith(invoices: invoicesResult.invoices));
     } catch (e) {
       debugPrint('❌ OrderDetailBloc._onLoadInvoices error: $e');
       // Don't show error for invoices, just keep existing invoices
@@ -194,10 +210,9 @@ class OrderDetailBloc extends Bloc<OrderDetailEvent, OrderDetailState> {
         orderId: event.orderId,
       );
 
-      emit(state.copyWith(
-        shipments: result.shipments,
-        shipmentsLoading: false,
-      ));
+      emit(
+        state.copyWith(shipments: result.shipments, shipmentsLoading: false),
+      );
     } catch (e) {
       debugPrint('❌ OrderDetailBloc._onLoadShipments error: $e');
       emit(state.copyWith(shipmentsLoading: false));
@@ -215,10 +230,9 @@ class OrderDetailBloc extends Bloc<OrderDetailEvent, OrderDetailState> {
         event.shipmentId,
       );
 
-      emit(state.copyWith(
-        shipmentDetail: shipment,
-        shipmentDetailLoading: false,
-      ));
+      emit(
+        state.copyWith(shipmentDetail: shipment, shipmentDetailLoading: false),
+      );
     } catch (e) {
       debugPrint('❌ OrderDetailBloc._onLoadShipmentDetail error: $e');
       emit(state.copyWith(shipmentDetailLoading: false));
@@ -242,25 +256,29 @@ class OrderDetailBloc extends Bloc<OrderDetailEvent, OrderDetailState> {
       final result = await repository.reorderOrder(orderId: event.orderId);
 
       if (result.success) {
-        emit(state.copyWith(
-          status: OrderDetailStatus.reorderSuccess,
-          successMessage: result.message,
-          reorderItemsCount: result.itemsAddedCount,
-        ));
+        emit(
+          state.copyWith(
+            status: OrderDetailStatus.reorderSuccess,
+            successMessage: result.message,
+            reorderItemsCount: result.itemsAddedCount,
+          ),
+        );
       } else {
-        emit(state.copyWith(
-          status: OrderDetailStatus.error,
-          errorMessage: result.message,
-        ));
+        emit(
+          state.copyWith(
+            status: OrderDetailStatus.error,
+            errorMessage: result.message,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('❌ OrderDetailBloc._onReorder error: $e');
-      emit(state.copyWith(
-        status: OrderDetailStatus.error,
-        errorMessage: e is AccountException
-            ? e.message
-            : 'Failed to reorder',
-      ));
+      emit(
+        state.copyWith(
+          status: OrderDetailStatus.error,
+          errorMessage: e is AccountException ? e.message : 'Failed to reorder',
+        ),
+      );
     }
   }
 }

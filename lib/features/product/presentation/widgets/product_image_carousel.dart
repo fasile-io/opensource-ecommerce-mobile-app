@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
+import 'fullscreen_image_viewer.dart';
 
 /// Image carousel at the top of the product detail page
 /// Figma: 375×375 product image with page dots below
@@ -60,24 +61,31 @@ class _ProductImageCarouselState extends State<ProductImageCarousel> {
               setState(() => _currentIndex = index);
             },
             itemBuilder: (context, index) {
-              return CachedNetworkImage(
-                imageUrl: widget.imageUrls[index],
-                fit: BoxFit.cover,
-                placeholder: (ctx, url) => Container(
-                  color: isDark ? AppColors.neutral800 : AppColors.neutral100,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary500,
-                      strokeWidth: 2,
+              return GestureDetector(
+                onTap: () => FullscreenImageViewer.open(
+                  context,
+                  imageUrls: widget.imageUrls,
+                  initialIndex: index,
+                ),
+                child: CachedNetworkImage(
+                  imageUrl: widget.imageUrls[index],
+                  fit: BoxFit.cover,
+                  placeholder: (ctx, url) => Container(
+                    color: isDark ? AppColors.neutral800 : AppColors.neutral100,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary500,
+                        strokeWidth: 2,
+                      ),
                     ),
                   ),
-                ),
-                errorWidget: (ctx, url, err) => Container(
-                  color: isDark ? AppColors.neutral800 : AppColors.neutral100,
-                  child: Icon(
-                    Icons.broken_image_outlined,
-                    size: 48,
-                    color: AppColors.neutral400,
+                  errorWidget: (ctx, url, err) => Container(
+                    color: isDark ? AppColors.neutral800 : AppColors.neutral100,
+                    child: Icon(
+                      Icons.broken_image_outlined,
+                      size: 48,
+                      color: AppColors.neutral400,
+                    ),
                   ),
                 ),
               );

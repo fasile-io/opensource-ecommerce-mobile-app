@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/currency/currency_cubit.dart';
+import '../../../../core/locale/locale_cubit.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../bloc/preferences_cubit.dart';
 import 'cms_page_detail_page.dart';
 import 'contact_us_page.dart';
+import 'settings_bottom_sheet.dart';
 
 /// Preferences Bottom Sheet — Figma node-id=215-5028 (pop-over-preferences)
 ///
@@ -23,17 +27,34 @@ import 'contact_us_page.dart';
 ///   - Body text: #171717 / dark: neutral200
 ///   - Border/divider: #D4D4D4
 class PreferencesBottomSheet extends StatefulWidget {
-  const PreferencesBottomSheet({super.key});
+  final bool showSettingsSection;
+  final BuildContext parentContext;
+
+  const PreferencesBottomSheet({
+    super.key,
+    required this.parentContext,
+    this.showSettingsSection = true,
+  });
 
   /// Show the preferences bottom sheet from any context
-  static Future<void> show(BuildContext context) {
+  static Future<void> show(
+    BuildContext context, {
+    bool showSettingsSection = true,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider(
-        create: (_) => PreferencesCubit(),
-        child: const PreferencesBottomSheet(),
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => PreferencesCubit()),
+          BlocProvider.value(value: context.read<CurrencyCubit>()),
+          BlocProvider.value(value: context.read<LocaleCubit>()),
+        ],
+        child: PreferencesBottomSheet(
+          parentContext: context,
+          showSettingsSection: showSettingsSection,
+        ),
       ),
     );
   }
@@ -43,8 +64,6 @@ class PreferencesBottomSheet extends StatefulWidget {
 }
 
 class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
-  bool _isOrderReturnExpanded = false;
-  bool _isSettingsExpanded = false;
   bool _isPreferencesExpanded = false;
   bool _isOthersExpanded = false;
 
@@ -66,6 +85,7 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     final bgColor = isDark ? AppColors.neutral800 : AppColors.white;
     final listItemBg = isDark ? AppColors.neutral700 : AppColors.neutral100;
     final textColor = isDark ? AppColors.neutral200 : AppColors.neutral900;
@@ -99,45 +119,19 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                 // ── Menu Items ──
                 // Figma node: 215:5399
                 
-                // Order and Return (Expandable)
-                _buildExpandableMenuItem(
-                  label: 'Order and Return',
-                  isExpanded: _isOrderReturnExpanded,
-                  listItemBg: listItemBg,
-                  textColor: textColor,
-                  onTap: () {
-                    setState(() {
-                      _isOrderReturnExpanded = !_isOrderReturnExpanded;
-                    });
-                  },
-                  children: [
-                    _buildSubMenuItem('Track Order'),
-                    _buildSubMenuItem('Return Policy'),
-                    _buildSubMenuItem('Return Request'),
-                  ],
-                ),
+                if (widget.showSettingsSection) ...[
+                  _buildNavigationMenuItem(
+                    label: l10n.accountSettings,
+                    listItemBg: listItemBg,
+                    textColor: textColor,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      SettingsBottomSheet.show(widget.parentContext);
+                    },
+                  ),
 
-                const SizedBox(height: 2),
-
-                // Settings (Expandable)
-                _buildExpandableMenuItem(
-                  label: 'Settings',
-                  isExpanded: _isSettingsExpanded,
-                  listItemBg: listItemBg,
-                  textColor: textColor,
-                  onTap: () {
-                    setState(() {
-                      _isSettingsExpanded = !_isSettingsExpanded;
-                    });
-                  },
-                  children: [
-                    _buildSubMenuItem('Notifications'),
-                    _buildSubMenuItem('Privacy'),
-                    _buildSubMenuItem('Account'),
-                  ],
-                ),
-
-                const SizedBox(height: 2),
+                  const SizedBox(height: 2),
+                ],
 
                 // Preferences (expandable)
                 _buildPreferencesSection(
@@ -178,15 +172,60 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
     );
   }
 
+  Widget _buildNavigationMenuItem({
+    required String label,
+    required Color listItemBg,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: listItemBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14,
+                    color: textColor,
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: textColor,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Build header with title and close button
   Widget _buildHeader(BuildContext context, Color textColor) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Preferences',
+            l10n.accountPreferences,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w500,
@@ -211,98 +250,6 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
     );
   }
 
-  /// Build an expandable menu item with sub-items
-  Widget _buildExpandableMenuItem({
-    required String label,
-    required bool isExpanded,
-    required Color listItemBg,
-    required Color textColor,
-    required VoidCallback onTap,
-    List<Widget> children = const [],
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final subItemBg = isDark ? AppColors.neutral700 : AppColors.neutral50;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: listItemBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontWeight: FontWeight.w400,
-                        fontSize: 14,
-                        color: textColor,
-                      ),
-                    ),
-                    Icon(
-                      isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: textColor,
-                      size: 20,
-                    ),
-                  ],
-                ),
-              ),
-              if (isExpanded)
-                Container(
-                  decoration: BoxDecoration(
-                    color: subItemBg,
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(10),
-                      bottomRight: Radius.circular(10),
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: children,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Build a sub-menu item
-  Widget _buildSubMenuItem(String title) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final subTextColor = isDark ? AppColors.neutral300 : AppColors.neutral600;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      child: Row(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.w400,
-              fontSize: 13,
-              color: subTextColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Build the Preferences section with Language and Currency sub-items
   Widget _buildPreferencesSection({
     required BuildContext context,
@@ -312,6 +259,8 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
     required Color textColor,
     required Color secondaryTextColor,
   }) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       decoration: BoxDecoration(
         color: listItemBg,
@@ -335,7 +284,7 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Preferences',
+                      l10n.accountPreferences,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w400,
@@ -368,7 +317,6 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                       _buildLanguageSelector(
                         context: context,
                         isDark: isDark,
-                        bgColor: bgColor,
                         secondaryTextColor: secondaryTextColor,
                         state: state,
                       ),
@@ -379,7 +327,6 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                       _buildCurrencySelector(
                         context: context,
                         isDark: isDark,
-                        bgColor: bgColor,
                         secondaryTextColor: secondaryTextColor,
                       ),
 
@@ -398,10 +345,12 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
   Widget _buildLanguageSelector({
     required BuildContext context,
     required bool isDark,
-    required Color bgColor,
     required Color secondaryTextColor,
     required PreferencesState state,
   }) {
+    final l10n = AppLocalizations.of(context)!;
+    final availableLocales = state.locales;
+
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.neutral600 : AppColors.white,
@@ -413,7 +362,7 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Language',
+              l10n.accountLanguage,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -422,7 +371,45 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
               ),
             ),
             const SizedBox(height: 8),
-            if (state.isLoadingLocales)
+            if (availableLocales.isNotEmpty)
+              BlocBuilder<LocaleCubit, Locale?>(
+                builder: (context, locale) {
+                  final selectedCode = locale?.languageCode;
+                  final dropdownValue = availableLocales.any(
+                    (item) => item.code == selectedCode,
+                  )
+                      ? selectedCode
+                      : availableLocales.first.code;
+
+                  return DropdownButton<String>(
+                    value: dropdownValue,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    items: availableLocales.map((locale) {
+                      return DropdownMenuItem<String>(
+                        value: locale.code,
+                        child: Text(
+                          locale.name,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                            color: isDark
+                                ? AppColors.neutral200
+                                : AppColors.neutral900,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      context.read<PreferencesCubit>().updateSelectedLocale(value);
+                      context.read<LocaleCubit>().setLocale(value);
+                    },
+                  );
+                },
+              )
+            else if (state.isLoadingLocales)
               SizedBox(
                 height: 40,
                 child: Center(
@@ -438,11 +425,11 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                   ),
                 ),
               )
-            else if (state.locales.isEmpty)
+            else if (availableLocales.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  'No languages available',
+                  l10n.accountNoLanguagesAvailable,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w400,
@@ -451,31 +438,6 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                   ),
                 ),
               )
-            else
-              DropdownButton<String>(
-                value: state.selectedLocaleCode,
-                isExpanded: true,
-                underline: SizedBox(),
-                items: state.locales.map((locale) {
-                  return DropdownMenuItem<String>(
-                    value: locale.code,
-                    child: Text(
-                      locale.name,
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontWeight: FontWeight.w400,
-                        fontSize: 14,
-                        color: isDark ? AppColors.neutral200 : AppColors.neutral900,
-                      ),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    context.read<PreferencesCubit>().updateSelectedLocale(value);
-                  }
-                },
-              ),
           ],
         ),
       ),
@@ -486,11 +448,9 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
   Widget _buildCurrencySelector({
     required BuildContext context,
     required bool isDark,
-    required Color bgColor,
     required Color secondaryTextColor,
   }) {
-    // TODO: Load available currencies from API
-    final currencies = ['USD', 'EUR', 'GBP', 'INR'];
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -503,7 +463,7 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Currency',
+              l10n.accountCurrency,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -514,29 +474,73 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
             const SizedBox(height: 8),
             BlocBuilder<PreferencesCubit, PreferencesState>(
               builder: (context, state) {
-                return DropdownButton<String>(
-                  value: state.selectedCurrency ?? 'USD',
-                  isExpanded: true,
-                  underline: SizedBox(),
-                  items: currencies.map((currency) {
-                    return DropdownMenuItem<String>(
-                      value: currency,
-                      child: Text(
-                        currency,
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          color: isDark ? AppColors.neutral200 : AppColors.neutral900,
+                if (state.currencies.isNotEmpty) {
+                  return BlocBuilder<CurrencyCubit, String?>(
+                    builder: (context, selectedCurrency) {
+                      final dropdownValue = state.currencies.any(
+                        (item) => item.code == selectedCurrency,
+                      )
+                          ? selectedCurrency
+                          : state.currencies.first.code;
+
+                      return DropdownButton<String>(
+                        value: dropdownValue,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        items: state.currencies.map((currency) {
+                          return DropdownMenuItem<String>(
+                            value: currency.code,
+                            child: Text(
+                              '${currency.name} (${currency.code})',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w400,
+                                fontSize: 14,
+                                color: isDark
+                                    ? AppColors.neutral200
+                                    : AppColors.neutral900,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          context.read<PreferencesCubit>().updateSelectedCurrency(
+                            value,
+                          );
+                          context.read<CurrencyCubit>().setCurrency(value);
+                        },
+                      );
+                    },
+                  );
+                }
+
+                if (state.isLoadingCurrencies) {
+                  return SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary500,
+                          ),
                         ),
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      context.read<PreferencesCubit>().updateSelectedCurrency(value);
-                    }
-                  },
+                    ),
+                  );
+                }
+
+                return Text(
+                  'No currencies available',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: secondaryTextColor,
+                  ),
                 );
               },
             ),
@@ -554,6 +558,8 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
     required Color textColor,
     required Color secondaryTextColor,
   }) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       decoration: BoxDecoration(
         color: listItemBg,
@@ -580,7 +586,7 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Others',
+                      l10n.accountOthers,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w400,
@@ -627,7 +633,7 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Text(
-                        'No pages available',
+                        l10n.accountNoPagesAvailable,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontWeight: FontWeight.w400,
@@ -717,6 +723,8 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
     required Color listItemBg,
     required Color textColor,
   }) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       decoration: BoxDecoration(
         color: listItemBg,
@@ -736,7 +744,7 @@ class _PreferencesBottomSheetState extends State<PreferencesBottomSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Contact Us',
+                  l10n.accountContactUs,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w400,

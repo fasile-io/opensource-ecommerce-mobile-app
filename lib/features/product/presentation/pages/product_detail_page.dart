@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/recently_viewed/recently_viewed_products_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../../category/data/models/product_model.dart';
 import '../../../category/data/repository/category_repository.dart';
 import '../../../cart/presentation/bloc/cart_bloc.dart';
@@ -46,9 +48,17 @@ import '../../../../core/widgets/app_back_button.dart';
 ///  │ Add to Cart │ Buy Now │  ← sticky bottom
 class ProductDetailPage extends StatefulWidget {
   final String urlKey;
+  final String? productId;
   final String? productName;
+  final String? productType;
 
-  const ProductDetailPage({super.key, required this.urlKey, this.productName});
+  const ProductDetailPage({
+    super.key,
+    this.urlKey = '',
+    this.productId,
+    this.productName,
+    this.productType,
+  });
 
   @override
   State<ProductDetailPage> createState() => _ProductDetailPageState();
@@ -88,10 +98,20 @@ class _ProductDetailPageState extends State<ProductDetailPage>
     final repository = context.read<CategoryRepository>();
 
     return BlocProvider(
-      create: (_) =>
-          ProductDetailBloc(repository: repository)
-            ..add(LoadProductDetail(urlKey: widget.urlKey)),
-      child: _ProductDetailView(productName: widget.productName, urlKey: widget.urlKey),
+      create: (_) => ProductDetailBloc(repository: repository)
+        ..add(
+          LoadProductDetail(
+            urlKey: widget.urlKey,
+            productId: widget.productId,
+            productType: widget.productType,
+          ),
+        ),
+      child: _ProductDetailView(
+        productName: widget.productName,
+        urlKey: widget.urlKey,
+        productId: widget.productId,
+        productType: widget.productType,
+      ),
     );
   }
 }
@@ -99,19 +119,35 @@ class _ProductDetailPageState extends State<ProductDetailPage>
 class _ProductDetailView extends StatelessWidget {
   final String? productName;
   final String urlKey;
+  final String? productId;
+  final String? productType;
 
-  const _ProductDetailView({this.productName, required this.urlKey});
+  const _ProductDetailView({
+    this.productName,
+    required this.urlKey,
+    this.productId,
+    this.productType,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
-      body: Column(
-        children: [
+    return BlocListener<ProductDetailBloc, ProductDetailState>(
+      listenWhen: (previous, current) => previous.product?.id != current.product?.id,
+      listener: (context, state) {
+        final product = state.product;
+        if (product != null) {
+          RecentlyViewedProductsService.trackProduct(product);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
+        body: Column(
+          children: [
           // ── AppBar ──
-          _buildAppBar(context, isDark),
+          _buildAppBar(context, isDark, l10n),
 
           // ── Scrollable Content ──
           Expanded(
@@ -136,7 +172,7 @@ class _ProductDetailView extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Failed to load product',
+                            l10n.productFailedToLoad,
                             style: AppTextStyles.text4(context),
                           ),
                           const SizedBox(height: 8),
@@ -153,82 +189,93 @@ class _ProductDetailView extends StatelessWidget {
 
                 final product = state.product;
                 if (product == null) {
-                  return const Center(child: Text('Product not found'));
+                  return Center(child: Text(l10n.productNotFound));
                 }
 
                 return RefreshIndicator(
-                  onRefresh: () async {
-                    context.read<ProductDetailBloc>().add(
-                      RefreshProductDetail(urlKey: urlKey),
-                    );
-                    await context.read<ProductDetailBloc>().stream.firstWhere(
-                      (s) => s.status == ProductDetailStatus.loaded || s.status == ProductDetailStatus.error,
-                    );
-                  },
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image carousel — show variant image if selected
-                        ProductImageCarousel(
-                          imageUrls: _getImageUrls(product, state),
+                    onRefresh: () async {
+                      context.read<ProductDetailBloc>().add(
+                        RefreshProductDetail(
+                          urlKey: urlKey,
+                          productId: productId,
+                          productType: productType,
                         ),
-
-                        const SizedBox(height: 32),
-
-                        // Product info (name, price, rating, stock)
-                        // Price updates when a variant is selected
-                        ProductInfoSection(
-                          product: product,
-                          selectedVariant: state.selectedVariant,
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Attributes (size, color, text swatches, quantity)
-                        ProductAttributesSection(product: product),
-
-                        const SizedBox(height: 32),
-
-                        // Description
-                        ProductDescriptionSection(product: product),
-
-                        const SizedBox(height: 32),
-
-                        // More information
-                        ProductMoreInfoSection(product: product),
-
-                        const SizedBox(height: 32),
-
-                        // Reviews
-                        ProductReviewsSection(product: product),
-
-                        const SizedBox(height: 32),
-
-                        // Related products
-                        if (state.relatedProducts.isNotEmpty)
-                          ProductRelatedSection(
-                            relatedProducts: state.relatedProducts,
-                            onProductTap: (relatedProduct) {
-                              if (relatedProduct.urlKey != null) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ProductDetailPage(
-                                      urlKey: relatedProduct.urlKey!,
-                                      productName: relatedProduct.name,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
+                      );
+                      await context.read<ProductDetailBloc>().stream.firstWhere(
+                        (s) =>
+                            s.status == ProductDetailStatus.loaded ||
+                            s.status == ProductDetailStatus.error,
+                      );
+                    },
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Image carousel — show variant image if selected
+                          ProductImageCarousel(
+                            imageUrls: _getImageUrls(product, state),
                           ),
 
-                        const SizedBox(height: 16),
-                      ],
+                          const SizedBox(height: 32),
+
+                          // Product info (name, price, rating, stock)
+                          // Price updates when a variant is selected
+                          ProductInfoSection(
+                            product: product,
+                            selectedVariant: state.selectedVariant,
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          // Attributes (size, color, text swatches, quantity)
+                          ProductAttributesSection(product: product),
+
+                          const SizedBox(height: 32),
+
+                          // Description
+                          ProductDescriptionSection(product: product),
+
+                          const SizedBox(height: 32),
+
+                          // More information
+                          ProductMoreInfoSection(product: product),
+
+                          const SizedBox(height: 32),
+
+                          // Reviews
+                          ProductReviewsSection(product: product),
+
+                          const SizedBox(height: 32),
+
+                          // Related products
+                          if (state.relatedProducts.isNotEmpty)
+                            ProductRelatedSection(
+                              relatedProducts: state.relatedProducts,
+                              onProductTap: (relatedProduct) {
+                                if (relatedProduct.urlKey != null) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ProductDetailPage(
+                                        urlKey: relatedProduct.urlKey!,
+                                        productId:
+                                            relatedProduct.numericId
+                                                ?.toString() ??
+                                            relatedProduct.id,
+                                        productName: relatedProduct.name,
+                                        productType: relatedProduct.type,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+
+                          const SizedBox(height: 16),
+                        ],
+                      ),
                     ),
-                  ),
-                );
+                  );
               },
             ),
           ),
@@ -242,7 +289,8 @@ class _ProductDetailView extends StatelessWidget {
               return const ProductActionBar();
             },
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -262,7 +310,11 @@ class _ProductDetailView extends StatelessWidget {
     return productImages;
   }
 
-  Widget _buildAppBar(BuildContext context, bool isDark) {
+  Widget _buildAppBar(
+    BuildContext context,
+    bool isDark,
+    AppLocalizations l10n,
+  ) {
     return Container(
       color: isDark ? AppColors.neutral800 : AppColors.white,
       child: SafeArea(
@@ -283,7 +335,7 @@ class _ProductDetailView extends StatelessWidget {
                       final title =
                           state.product?.name ??
                           productName ??
-                          'Product Detail';
+                          l10n.productDetail;
                       return Text(
                         title,
                         style: AppTextStyles.text4(context),

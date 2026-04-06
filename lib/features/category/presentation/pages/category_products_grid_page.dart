@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/product_model.dart';
 import '../../data/models/filter_model.dart';
 import '../../data/repository/category_repository.dart';
@@ -316,38 +317,60 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
   }
 
   Widget _buildSliverGridView(BuildContext context, ProductListState state) {
-    final itemCount = state.products.length + (state.isLoadingMore ? 1 : 0);
     final screenWidth = MediaQuery.of(context).size.width;
     final crossAxisCount = _gridCrossAxisCount(screenWidth);
 
-    return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      sliver: SliverGrid(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          // Use 0.56 to give more vertical space for text content.
-          // This prevents overflow with long names, discounted prices,
-          // and rating rows on all screen sizes.
-          childAspectRatio: 0.56,
+    // Calculate card width, then derive exact height:
+    // image (square = cardWidth) + padding(8) + name(17) + gap(4) + price(18) + gap(4) + rating(20)
+    const horizontalPadding = 20.0 * 2;
+    const crossAxisSpacing = 12.0;
+    final cardWidth =
+        (screenWidth - horizontalPadding - crossAxisSpacing * (crossAxisCount - 1)) /
+            crossAxisCount;
+    const textSectionHeight = 80.0;
+    final mainAxisExtent = cardWidth + textSectionHeight;
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            8,
+            20,
+            state.isLoadingMore ? 8 : 24,
+          ),
+          sliver: SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: crossAxisSpacing,
+              mainAxisSpacing: 12,
+              mainAxisExtent: mainAxisExtent,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final product = state.products[index];
+              return _ProductCardGrid(
+                product: product,
+                cardWidth: double.infinity,
+              );
+            }, childCount: state.products.length),
+          ),
         ),
-        delegate: SliverChildBuilderDelegate((context, index) {
-          if (index >= state.products.length) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: CircularProgressIndicator(
-                  color: AppColors.primary500,
-                  strokeWidth: 2,
+        if (state.isLoadingMore)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(20, 0, 20, 24),
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary500,
+                    strokeWidth: 2,
+                  ),
                 ),
               ),
-            );
-          }
-          final product = state.products[index];
-          return _ProductCardGrid(product: product, cardWidth: double.infinity);
-        }, childCount: itemCount),
-      ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -407,11 +430,9 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
             child: GestureDetector(
               onTap: () {
                 // Navigate to search page
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const SearchPage(),
-                  ),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const SearchPage()));
               },
               child: Container(
                 height: 48,
@@ -441,7 +462,9 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
                     Icon(
                       Icons.search,
                       size: 24,
-                      color: isDark ? AppColors.neutral300 : AppColors.neutral800,
+                      color: isDark
+                          ? AppColors.neutral300
+                          : AppColors.neutral800,
                     ),
                   ],
                 ),
@@ -509,6 +532,7 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
   /// Count row: "X Items Found" + grid/list toggle icons
   /// Figma: px-20, "5 Items Found" 12px Medium #171717 + toggle icons
   Widget _buildCountRow(BuildContext context, ProductListState state) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Show loading placeholder when fetching and no products yet
@@ -533,7 +557,7 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
                   ),
                 )
               : Text(
-                  '${state.totalProducts} Items Found',
+                  l10n.categoryItemsFound(state.totalProducts),
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 12,
@@ -572,6 +596,7 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
@@ -586,7 +611,7 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
             ),
             const SizedBox(height: 12),
             Text(
-              'No products found',
+              l10n.categoryNoProductsFound,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 16,
@@ -596,7 +621,7 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
             ),
             const SizedBox(height: 8),
             Text(
-              'Try adjusting your filters or search criteria',
+              l10n.categoryTryAdjustingFilters,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 14,
@@ -610,6 +635,7 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
   }
 
   Widget _buildErrorState(BuildContext context, String? errorMessage) {
+    final l10n = AppLocalizations.of(context)!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Padding(
@@ -620,7 +646,7 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
             Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 12),
             Text(
-              'Something went wrong',
+              l10n.categorySomethingWentWrong,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 16,
@@ -655,8 +681,8 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary500,
               ),
-              child: const Text(
-                'Retry',
+              child: Text(
+                l10n.commonRetry,
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontWeight: FontWeight.w600,
@@ -680,7 +706,11 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
     );
   }
 
-  void _showFilterSheet(BuildContext context, ProductListState state, {int? initialSelectedIndex}) {
+  void _showFilterSheet(
+    BuildContext context,
+    ProductListState state, {
+    int? initialSelectedIndex,
+  }) {
     FilterBottomSheet.show(
       context,
       filterAttributes: state.filterAttributes,
@@ -715,9 +745,15 @@ class _CategoryProductsGridViewState extends State<_CategoryProductsGridView>
     FilterAttribute attribute,
   ) {
     // Find the index of the clicked attribute in the filter attributes list
-    final index = state.filterAttributes.indexWhere((attr) => attr.code == attribute.code);
+    final index = state.filterAttributes.indexWhere(
+      (attr) => attr.code == attribute.code,
+    );
     // Show the full filter sheet with the relevant attribute tab selected
-    _showFilterSheet(context, state, initialSelectedIndex: index >= 0 ? index : null);
+    _showFilterSheet(
+      context,
+      state,
+      initialSelectedIndex: index >= 0 ? index : null,
+    );
   }
 }
 
@@ -844,44 +880,40 @@ class _ProductCardGrid extends StatelessWidget {
             ),
           ),
 
-          // ── Text content (takes remaining space, prevents overflow) ──
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Name ──
-                  Flexible(
-                    flex: 2,
-                    child: Text(
-                      product.name ?? 'Product',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        height: 1.2,
-                        color: isDark
-                            ? AppColors.neutral300
-                            : AppColors.neutral800,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          // ── Text content ──
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Name ──
+                Text(
+                  product.name ??
+                      AppLocalizations.of(context)!.productDefaultName,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    height: 1.2,
+                    color: isDark
+                        ? AppColors.neutral300
+                        : AppColors.neutral800,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
 
-                  const SizedBox(height: 4),
+                const SizedBox(height: 4),
 
-                  // ── Price Row ──
-                  _buildPriceRow(context),
+                // ── Price Row ──
+                _buildPriceRow(context),
 
-                  const SizedBox(height: 4),
+                const SizedBox(height: 4),
 
-                  // ── Rating Row ──
-                  _buildRatingRow(context),
-                ],
-              ),
+                // ── Rating Row ──
+                _buildRatingRow(context),
+              ],
             ),
           ),
         ],
@@ -896,10 +928,11 @@ class _ProductCardGrid extends StatelessWidget {
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Current price
           Text(
-            '\$${product.displayPrice.toStringAsFixed(2)}',
+            product.formattedDisplayPrice,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 18,
@@ -912,7 +945,7 @@ class _ProductCardGrid extends StatelessWidget {
           if (product.originalPrice != null) ...[
             const SizedBox(width: 3),
             Text(
-              '\$${product.originalPrice!.toStringAsFixed(2)}',
+              product.formattedOriginalPrice ?? '',
               style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 14,
@@ -927,7 +960,9 @@ class _ProductCardGrid extends StatelessWidget {
           if (product.discountPercent != null) ...[
             const SizedBox(width: 3),
             Text(
-              '${product.discountPercent}% off',
+              AppLocalizations.of(
+                context,
+              )!.productDiscountOff(product.discountPercent.toString()),
               style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 14,
@@ -997,7 +1032,9 @@ class _ProductCardGrid extends StatelessWidget {
         MaterialPageRoute(
           builder: (_) => ProductDetailPage(
             urlKey: product.urlKey!,
+            productId: product.numericId?.toString() ?? product.id,
             productName: product.name,
+            productType: product.type,
           ),
         ),
       );
@@ -1017,11 +1054,13 @@ class _ProductCardGrid extends StatelessWidget {
 
       if (result == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please login to manage wishlist'),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.categoryLoginToManageWishlist,
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
         return;
@@ -1029,7 +1068,11 @@ class _ProductCardGrid extends StatelessWidget {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result ? 'Added to wishlist' : 'Removed from wishlist'),
+          content: Text(
+            result
+                ? AppLocalizations.of(context)!.categoryAddedToWishlist
+                : AppLocalizations.of(context)!.categoryRemovedFromWishlist,
+          ),
           backgroundColor: AppColors.successGreen,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -1039,7 +1082,11 @@ class _ProductCardGrid extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update wishlist: $e'),
+          content: Text(
+            AppLocalizations.of(
+              context,
+            )!.categoryFailedToUpdateWishlist(e.toString()),
+          ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -1068,7 +1115,9 @@ class _ProductCardList extends StatelessWidget {
             MaterialPageRoute(
               builder: (_) => ProductDetailPage(
                 urlKey: product.urlKey!,
+                productId: product.numericId?.toString() ?? product.id,
                 productName: product.name,
+                productType: product.type,
               ),
             ),
           );
@@ -1131,7 +1180,8 @@ class _ProductCardList extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.name ?? 'Product',
+                  product.name ??
+                      AppLocalizations.of(context)!.productDefaultName,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
@@ -1151,7 +1201,7 @@ class _ProductCardList extends StatelessWidget {
                   child: Row(
                     children: [
                       Text(
-                        '\$${product.displayPrice.toStringAsFixed(2)}',
+                        product.formattedDisplayPrice,
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 18,
@@ -1164,7 +1214,7 @@ class _ProductCardList extends StatelessWidget {
                       if (product.originalPrice != null) ...[
                         const SizedBox(width: 6),
                         Text(
-                          '\$${product.originalPrice!.toStringAsFixed(2)}',
+                          product.formattedOriginalPrice ?? '',
                           style: const TextStyle(
                             fontFamily: 'Roboto',
                             fontSize: 14,
@@ -1176,7 +1226,9 @@ class _ProductCardList extends StatelessWidget {
                       if (product.discountPercent != null) ...[
                         const SizedBox(width: 6),
                         Text(
-                          '${product.discountPercent}% off',
+                          AppLocalizations.of(context)!.productDiscountOff(
+                            product.discountPercent.toString(),
+                          ),
                           style: const TextStyle(
                             fontFamily: 'Roboto',
                             fontSize: 14,
@@ -1301,11 +1353,13 @@ class _ProductCardList extends StatelessWidget {
 
       if (result == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please login to manage wishlist'),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.categoryLoginToManageWishlist,
+            ),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
         return;
@@ -1313,7 +1367,11 @@ class _ProductCardList extends StatelessWidget {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result ? 'Added to wishlist' : 'Removed from wishlist'),
+          content: Text(
+            result
+                ? AppLocalizations.of(context)!.categoryAddedToWishlist
+                : AppLocalizations.of(context)!.categoryRemovedFromWishlist,
+          ),
           backgroundColor: AppColors.successGreen,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
@@ -1323,7 +1381,11 @@ class _ProductCardList extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update wishlist: $e'),
+          content: Text(
+            AppLocalizations.of(
+              context,
+            )!.categoryFailedToUpdateWishlist(e.toString()),
+          ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),

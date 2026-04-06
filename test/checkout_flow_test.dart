@@ -472,7 +472,7 @@ void main() {
   group('Token flow logic (the critical fix)', () {
     test('cartToken from address response is NOT the auth token', () {
       const authToken =
-          '292|63wcgHLYiCNOPrSH2uz2o1EePs3QOC05jn2M7sNH21f7d595';
+          '292|example_auth_token_for_test_validation_only_12345';
       const addressResponse = {
         'success': true,
         'message': 'Address saved successfully',
@@ -490,7 +490,7 @@ void main() {
     test('shipping rates query uses cartToken, not authToken', () {
       const queryToken = '19';
       const authToken =
-          '292|63wcgHLYiCNOPrSH2uz2o1EePs3QOC05jn2M7sNH21f7d595';
+          '292|example_auth_token_for_test_validation_only_12345';
 
       expect(queryToken, isNot(equals(authToken)));
       expect(queryToken.length, lessThan(5));

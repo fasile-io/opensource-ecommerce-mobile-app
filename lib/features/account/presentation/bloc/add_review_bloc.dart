@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../data/models/account_models.dart';
 import '../../data/repository/account_repository.dart';
 
@@ -71,11 +72,11 @@ class AddReviewState extends Equatable {
 
   @override
   List<Object?> get props => [
-        status,
-        createdReview,
-        successMessage,
-        errorMessage,
-      ];
+    status,
+    createdReview,
+    successMessage,
+    errorMessage,
+  ];
 }
 
 // ─── BLOC ───
@@ -83,8 +84,7 @@ class AddReviewState extends Equatable {
 class AddReviewBloc extends Bloc<AddReviewEvent, AddReviewState> {
   final AccountRepository repository;
 
-  AddReviewBloc({required this.repository})
-      : super(const AddReviewState()) {
+  AddReviewBloc({required this.repository}) : super(const AddReviewState()) {
     on<SubmitReview>(_onSubmit);
     on<ClearAddReviewMessage>(_onClearMessage);
   }
@@ -104,17 +104,21 @@ class AddReviewBloc extends Bloc<AddReviewEvent, AddReviewState> {
         name: event.name,
       );
 
-      emit(state.copyWith(
-        status: AddReviewStatus.success,
-        createdReview: review,
-        successMessage: 'Review submitted successfully!',
-      ));
+      emit(
+        state.copyWith(
+          status: AddReviewStatus.success,
+          createdReview: review,
+          successMessage: 'Review submitted successfully!',
+        ),
+      );
     } catch (e) {
       debugPrint('❌ AddReviewBloc._onSubmit error: $e');
-      emit(state.copyWith(
-        status: AddReviewStatus.error,
-        errorMessage: e.toString().replaceFirst('AccountException: ', ''),
-      ));
+      emit(
+        state.copyWith(
+          status: AddReviewStatus.error,
+          errorMessage: ErrorMapper.getUserMessage(e),
+        ),
+      );
     }
   }
 
@@ -122,9 +126,6 @@ class AddReviewBloc extends Bloc<AddReviewEvent, AddReviewState> {
     ClearAddReviewMessage event,
     Emitter<AddReviewState> emit,
   ) {
-    emit(state.copyWith(
-      errorMessage: null,
-      successMessage: null,
-    ));
+    emit(state.copyWith(errorMessage: null, successMessage: null));
   }
 }

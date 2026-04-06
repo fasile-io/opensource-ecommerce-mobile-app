@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import 'section_header.dart';
 
@@ -20,6 +21,8 @@ class ProductReviewsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.only(top: 24),
       child: Column(
@@ -28,7 +31,7 @@ class ProductReviewsSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: SectionHeader(
-              title: 'Product Reviews',
+              title: l10n.accountProductReviews,
               onViewAll: reviews.isNotEmpty
                   ? onViewAll
                   : null,
@@ -57,6 +60,7 @@ class ProductReviewsSection extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Container(
@@ -71,7 +75,7 @@ class ProductReviewsSection extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            'No product reviews yet',
+            l10n.accountNoProductReviewsYet,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
@@ -85,6 +89,7 @@ class ProductReviewsSection extends StatelessWidget {
 
   Widget _buildReviewCard(BuildContext context, ProductReview review) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       width: double.infinity,
@@ -143,7 +148,7 @@ class ProductReviewsSection extends StatelessWidget {
               // Product name
               Expanded(
                 child: Text(
-                  review.productName ?? 'Product',
+                  review.productName ?? l10n.productDefaultName,
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w500,
@@ -215,7 +220,7 @@ class ProductReviewsSection extends StatelessWidget {
               if (review.formattedDate.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'Posted on ${review.formattedDate}',
+                  l10n.accountPostedOn(review.formattedDate),
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontWeight: FontWeight.w400,

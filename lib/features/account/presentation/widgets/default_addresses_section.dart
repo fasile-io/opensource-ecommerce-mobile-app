@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../l10n/app_localizations.dart';
 import '../../data/models/account_models.dart';
 import 'section_header.dart';
 
@@ -17,6 +18,8 @@ class DefaultAddressesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     // Find default billing and shipping addresses
     CustomerAddress? billingAddress;
     CustomerAddress? shippingAddress;
@@ -46,7 +49,7 @@ class DefaultAddressesSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: SectionHeader(
-              title: 'Default Addresses',
+              title: l10n.accountDefaultAddresses,
               onViewAll: addresses.isNotEmpty
                   ? onViewAll
                   : null,
@@ -64,14 +67,14 @@ class DefaultAddressesSection extends StatelessWidget {
                     _buildAddressCard(
                       context,
                       address: billingAddress,
-                      type: 'Billing Address',
+                      type: l10n.accountBillingAddress,
                     ),
                   if (shippingAddress != null) ...[
                     const SizedBox(height: 8),
                     _buildAddressCard(
                       context,
                       address: shippingAddress,
-                      type: 'Shipping Address',
+                      type: l10n.accountShippingAddress,
                     ),
                   ],
                 ],
@@ -84,6 +87,7 @@ class DefaultAddressesSection extends StatelessWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Container(
@@ -98,7 +102,7 @@ class DefaultAddressesSection extends StatelessWidget {
         ),
         child: Center(
           child: Text(
-            'No saved addresses',
+            l10n.accountNoAddressesSaved,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
@@ -146,7 +150,7 @@ class DefaultAddressesSection extends StatelessWidget {
               ),
               if (address.isDefault) ...[
                 const SizedBox(width: 4),
-                _buildDefaultBadge(),
+                _buildDefaultBadge(context),
               ],
             ],
           ),
@@ -177,7 +181,9 @@ class DefaultAddressesSection extends StatelessWidget {
     );
   }
 
-  Widget _buildDefaultBadge() {
+  Widget _buildDefaultBadge(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
@@ -185,9 +191,9 @@ class DefaultAddressesSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: const Color(0xFFB9F8CF)),
       ),
-      child: const Text(
-        'Default',
-        style: TextStyle(
+      child: Text(
+        l10n.accountDefault,
+        style: const TextStyle(
           fontFamily: 'Roboto',
           fontWeight: FontWeight.w700,
           fontSize: 12,
