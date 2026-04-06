@@ -1,5 +1,20 @@
 #### This changelog consists the bug & security fixes and new features being included in the releases listed below
 
+# CHANGELOG for v2.4.0
+
+## **v2.4.0 (6th of April, 2026)** - *Release*
+
+# CHANGELOG for v2.4.0
+
+* [Enhancement] Full-screen product image viewer with zoom and swipe support.
+* [Enhancement] In-app update alerts for the latest app versions.
+* [Enhancement] Added support for multiple languages.
+* [Enhancement] Booking product support added.
+* [Enhancement] Added support for downloadable and grouped products.
+* [Enhancement] Multi-currency support added.
+* [Enhancement] Push notifications added.
+* [Improvement] Fixed bugs to improve overall stability and performance.
+
 # CHANGELOG for v2.3.9
 
 ## **v2.3.9 (20th of Feb, 2026)** - *Release*
