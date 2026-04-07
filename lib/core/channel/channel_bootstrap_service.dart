@@ -64,17 +64,22 @@ class ChannelBootstrapService {
       jsonEncode(_encodeCurrencies(currencies)),
     );
 
-    if (defaultLocaleCode != null && defaultLocaleCode.isNotEmpty) {
+    // Only set defaults when the user has not already selected a preference.
+    final savedLocale = prefs.getString(LocaleCubit.localeKey);
+    if (savedLocale == null &&
+        defaultLocaleCode != null &&
+        defaultLocaleCode.isNotEmpty) {
       await prefs.setString(LocaleCubit.localeKey, defaultLocaleCode);
     }
 
-    if (defaultCurrencyCode != null && defaultCurrencyCode.isNotEmpty) {
+    final savedCurrency = prefs.getString(CurrencyCubit.currencyKey);
+    if (savedCurrency == null &&
+        defaultCurrencyCode != null &&
+        defaultCurrencyCode.isNotEmpty) {
       await CurrencyFormatter.updateSelectedCurrency(
         defaultCurrencyCode,
         prefs: prefs,
       );
-    } else {
-      await prefs.remove(CurrencyCubit.currencyKey);
     }
 
     await CurrencyFormatter.syncCurrencySymbols({

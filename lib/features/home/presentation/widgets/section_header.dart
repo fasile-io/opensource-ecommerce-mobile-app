@@ -9,14 +9,22 @@ import '../../../../core/theme/app_theme.dart';
 class SectionHeader extends StatelessWidget {
   final String title;
   final VoidCallback? onSeeAll;
+  final double horizontalPadding;
+  final TextStyle? titleStyle;
 
-  const SectionHeader({super.key, required this.title, this.onSeeAll});
+  const SectionHeader({
+    super.key,
+    required this.title,
+    this.onSeeAll,
+    this.horizontalPadding = 20,
+    this.titleStyle,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: GestureDetector(
         onTap: onSeeAll,
         behavior: HitTestBehavior.opaque,
@@ -26,12 +34,16 @@ class SectionHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontWeight: FontWeight.w500,
-                  fontSize: 18,
-                  color: isDark ? AppColors.neutral100 : AppColors.neutral900,
-                ),
+                style:
+                    titleStyle ??
+                    TextStyle(
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 18,
+                      color: isDark
+                          ? AppColors.neutral100
+                          : AppColors.neutral900,
+                    ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

@@ -15,9 +15,13 @@ class RecentlyViewedProductsService {
 
   static final ValueNotifier<int> changes = ValueNotifier<int>(0);
 
+  static bool _isTrackingEnabled(SharedPreferences prefs) {
+    return prefs.getBool(_trackKey) ?? true;
+  }
+
   static Future<List<HomeProduct>> getRecentProducts() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!(prefs.getBool(_trackKey) ?? false)) return const <HomeProduct>[];
+    if (!_isTrackingEnabled(prefs)) return const <HomeProduct>[];
     final raw = prefs.getString(_prefsKey);
     if (raw == null || raw.isEmpty) return const <HomeProduct>[];
 
@@ -39,7 +43,7 @@ class RecentlyViewedProductsService {
 
   static Future<void> trackProduct(ProductModel product) async {
     final prefs = await SharedPreferences.getInstance();
-    if (!(prefs.getBool(_trackKey) ?? false)) return;
+    if (!_isTrackingEnabled(prefs)) return;
 
     final numericId =
         product.numericId ?? int.tryParse(product.id.split('/').last);

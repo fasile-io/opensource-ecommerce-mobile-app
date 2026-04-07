@@ -8,10 +8,14 @@ import 'section_header.dart';
 
 class RecentlyViewedProductsSection extends StatelessWidget {
   final ValueChanged<HomeProduct> onProductTap;
+  final double horizontalPadding;
+  final TextStyle? titleStyle;
 
   const RecentlyViewedProductsSection({
     super.key,
     required this.onProductTap,
+    this.horizontalPadding = 20,
+    this.titleStyle,
   });
 
   @override
@@ -28,21 +32,30 @@ class RecentlyViewedProductsSection extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SectionHeader(title: AppLocalizations.of(context)!.homeRecentlyViewedProducts),
+                SectionHeader(
+                  title: AppLocalizations.of(
+                    context,
+                  )!.homeRecentlyViewedProducts,
+                  horizontalPadding: horizontalPadding,
+                  titleStyle: titleStyle,
+                ),
                 const SizedBox(height: 16),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final screenWidth = constraints.maxWidth > 0
                         ? constraints.maxWidth
                         : MediaQuery.of(context).size.width;
-                    final cardWidth = (screenWidth - 40 - 12) / 2;
+                    final totalHPadding = horizontalPadding * 2;
+                    final cardWidth = (screenWidth - totalHPadding - 12) / 2;
                     final listHeight = cardWidth + 96;
 
                     return SizedBox(
                       height: listHeight,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                        ),
                         itemCount: products.length,
                         separatorBuilder: (context, index) =>
                             const SizedBox(width: 12),
