@@ -460,7 +460,13 @@ class ProductDetailBloc extends Bloc<ProductDetailEvent, ProductDetailState> {
 
     // Try combinations first (new API), then legacy variant matching
     final variantId = state.product?.findVariantIdFromCombinations(updated);
-    final variant = state.product?.findVariant(updated);
+
+    // Resolve the variant object: by ID from combinations, or by attribute match (legacy)
+    ProductVariant? variant;
+    if (variantId != null) {
+      variant = state.product?.findVariantById(variantId);
+    }
+    variant ??= state.product?.findVariant(updated);
 
     emit(
       state.copyWith(

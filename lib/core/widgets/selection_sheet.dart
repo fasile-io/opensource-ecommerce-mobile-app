@@ -83,11 +83,17 @@ class _SelectionSheetState<T> extends State<SelectionSheet<T>> {
 
   @override
   Widget build(BuildContext context) {
-    final maxHeight = MediaQuery.of(context).size.height * 0.6;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final screenHeight = MediaQuery.of(context).size.height;
+    // Use up to 70% of screen, but also account for the keyboard so
+    // the list remains visible when the search field is focused.
+    final maxHeight = screenHeight * 0.7;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      child: Column(
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardHeight),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // ── Header ──
@@ -252,6 +258,7 @@ class _SelectionSheetState<T> extends State<SelectionSheet<T>> {
                   ),
           ),
         ],
+        ),
       ),
     );
   }

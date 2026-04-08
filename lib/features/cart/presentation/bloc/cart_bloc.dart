@@ -280,21 +280,34 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       return state.cartToken!;
     }
 
-    // CRITICAL: Check if user is already authenticated in AuthStorage
-    // This prevents creating a guest session when user is logged in
+    // Check if user is already authenticated in AuthStorage
+    // If so, fetch the auth token and configure the cart bloc
     final isUserLoggedIn = await AuthStorage.isLoggedIn();
     if (isUserLoggedIn) {
+      final authToken = await AuthStorage.getToken();
+      if (authToken != null && authToken.isNotEmpty) {
+        debugPrint(
+          '[CartBloc] _ensureToken: user is logged in, using auth token',
+        );
+        repository.updateToken(authToken, isGuest: false);
+        emit(
+          state.copyWith(
+            cartToken: authToken,
+            isGuest: false,
+          ),
+        );
+        return authToken;
+      }
       debugPrint(
-        '[CartBloc] _ensureToken: user is logged in, not creating guest session',
+        '[CartBloc] _ensureToken: user is logged in but no auth token found',
       );
       return null;
     }
 
-    // If user is authenticated but has no token in state, something is wrong
-    // Don't load guest session - let the caller handle this
+    // If state says authenticated but AuthStorage disagrees, don't create guest session
     if (!state.isGuest) {
       debugPrint(
-        '[CartBloc] _ensureToken: authenticated but no token in state',
+        '[CartBloc] _ensureToken: state says authenticated but no token available',
       );
       return null;
     }

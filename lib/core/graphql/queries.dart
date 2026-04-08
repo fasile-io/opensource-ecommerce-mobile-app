@@ -290,6 +290,10 @@ class ProductQueries {
             name
             sku
             price
+            formattedPrice
+            specialPrice
+            formattedSpecialPrice
+            baseImageUrl
             attributeValues {
               edges {
                 node {
@@ -811,6 +815,10 @@ $slotFields
             name
             sku
             price
+            formattedPrice
+            specialPrice
+            formattedSpecialPrice
+            baseImageUrl
             attributeValues {
               edges {
                 node {

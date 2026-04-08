@@ -22,26 +22,41 @@ class ThemeCustomization extends Equatable {
     required this.options,
   });
 
-  factory ThemeCustomization.fromJson(Map<String, dynamic> json) {
-    // Parse translations → find 'en' locale or first available
+  factory ThemeCustomization.fromJson(
+    Map<String, dynamic> json, {
+    String preferredLocale = 'en',
+  }) {
+    // Parse translations → find the preferred locale, fallback to 'en', then first available
     Map<String, dynamic> options = {};
+    Map<String, dynamic>? enOptions;
     final translations = json['translations']?['edges'] as List? ?? [];
     for (final edge in translations) {
       final node = edge['node'] as Map<String, dynamic>? ?? {};
       final locale = node['locale'] as String? ?? '';
-      if (locale == 'en' || options.isEmpty) {
-        final rawOptions = node['options'];
-        if (rawOptions is String) {
-          try {
-            options = jsonDecode(rawOptions) as Map<String, dynamic>;
-          } catch (_) {
-            options = {};
-          }
-        } else if (rawOptions is Map) {
-          options = Map<String, dynamic>.from(rawOptions);
-        }
-        if (locale == 'en') break; // prefer English
+
+      Map<String, dynamic>? parsed;
+      final rawOptions = node['options'];
+      if (rawOptions is String) {
+        try {
+          parsed = jsonDecode(rawOptions) as Map<String, dynamic>;
+        } catch (_) {}
+      } else if (rawOptions is Map) {
+        parsed = Map<String, dynamic>.from(rawOptions);
       }
+      if (parsed == null || parsed.isEmpty) continue;
+
+      if (locale == preferredLocale) {
+        options = parsed;
+        break; // exact match found
+      } else if (locale == 'en') {
+        enOptions = parsed; // keep English as fallback
+      } else if (options.isEmpty) {
+        options = parsed; // first available as last resort
+      }
+    }
+    // Use English fallback if preferred locale wasn't found
+    if (options.isEmpty && enOptions != null) {
+      options = enOptions;
     }
 
     return ThemeCustomization(

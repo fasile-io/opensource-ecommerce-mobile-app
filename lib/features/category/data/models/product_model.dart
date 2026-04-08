@@ -396,6 +396,18 @@ class ProductModel {
     return null;
   }
 
+  /// Find a variant by its numeric ID (from combinations lookup).
+  /// Parses the trailing number from the variant's "/api/shop/products/2420" ID.
+  ProductVariant? findVariantById(int variantId) {
+    if (variants.isEmpty) return null;
+    for (final variant in variants) {
+      final vid = variant.numericId ??
+          int.tryParse(variant.id.split('/').last);
+      if (vid == variantId) return variant;
+    }
+    return null;
+  }
+
   /// Resolve the numeric attribute ID for a configurable attribute code.
   int? getConfigurableAttributeId(String attributeCode) {
     for (final attribute in configurableAttributes) {

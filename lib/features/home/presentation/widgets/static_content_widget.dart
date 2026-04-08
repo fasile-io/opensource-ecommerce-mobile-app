@@ -41,6 +41,66 @@ class StaticContentWidget extends StatelessWidget {
     return _buildGenericContent(context);
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // IMAGE URL EXTRACTION HELPERS
+  // ──────────────────────────────────────────────────────────────────────
+
+  /// Extract the best image URL from an HTML snippet (e.g. a single tag or block).
+  /// Prefers data-src over src, skips empty values and non-image URLs.
+  static String _extractBestImageUrl(String htmlSnippet) {
+    // Try data-src first (lazy-loaded images)
+    final dataSrcMatch = RegExp(r'data-src="([^"]+)"').firstMatch(htmlSnippet);
+    if (dataSrcMatch != null) {
+      final url = dataSrcMatch.group(1) ?? '';
+      if (url.isNotEmpty) return url;
+    }
+
+    // Try src (direct images), but skip empty or placeholder values
+    final srcMatch = RegExp(r'\bsrc="([^"]+)"').firstMatch(htmlSnippet);
+    if (srcMatch != null) {
+      final url = srcMatch.group(1) ?? '';
+      if (url.isNotEmpty && !url.contains('data:image') && !url.endsWith('.gif') ) {
+        return url;
+      }
+    }
+
+    // Also check for background-image in inline styles
+    final bgMatch = RegExp(
+      r'''background-image:\s*url\(['"]?([^'")\s]+)['"]?\)''',
+    ).firstMatch(htmlSnippet);
+    if (bgMatch != null) {
+      final url = bgMatch.group(1) ?? '';
+      if (url.isNotEmpty) return url;
+    }
+
+    // Last resort: try src even if it's a gif (could be real content)
+    if (srcMatch != null) {
+      return srcMatch.group(1) ?? '';
+    }
+
+    return '';
+  }
+
+  /// Extract all image URLs from <img> tags in HTML.
+  /// Prefers data-src over src for each tag.
+  static List<String> _extractAllImageUrls(String htmlContent) {
+    final imgTagPattern = RegExp(r'<img[^>]*>', caseSensitive: false);
+    final urls = <String>[];
+
+    for (final match in imgTagPattern.allMatches(htmlContent)) {
+      final tag = match.group(0) ?? '';
+      final url = _extractBestImageUrl(tag);
+      if (url.isNotEmpty) {
+        urls.add(url);
+      }
+    }
+    return urls;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // SECTION BUILDERS
+  // ──────────────────────────────────────────────────────────────────────
+
   /// Build "Top Collections" style layout
   /// A header with title followed by a grid of collection cards
   Widget _buildTopCollections(BuildContext context) {
@@ -52,33 +112,32 @@ class StaticContentWidget extends StatelessWidget {
     ).firstMatch(html);
     final title = titleMatch?.group(1)?.trim() ?? l10n.homeCollections;
 
-    // Extract collection cards
-    final cardPattern = RegExp(
-      r'<div class="top-collection-card"[^>]*>.*?'
-      r'data-src="([^"]*)"[^>]*>.*?'
-      r'<h3[^>]*>(.*?)</h3>.*?'
-      r'</div>',
+    // Extract collection cards — find each card block, then extract image + title
+    final cardBlockPattern = RegExp(
+      r'<div class="top-collection-card"[^>]*>(.*?)</div>',
       dotAll: true,
     );
+    final titlePattern = RegExp(r'<h3[^>]*>(.*?)</h3>', dotAll: true);
 
     final cards = <_CollectionCard>[];
-    for (final match in cardPattern.allMatches(html)) {
-      final imagePath = match.group(1) ?? '';
-      final cardTitle = match.group(2)?.trim() ?? '';
+
+    for (final block in cardBlockPattern.allMatches(html)) {
+      final blockHtml = block.group(0) ?? '';
+      final imageUrl = _extractBestImageUrl(blockHtml);
+      final cardTitleMatch = titlePattern.firstMatch(blockHtml);
+      final cardTitle = cardTitleMatch?.group(1)?.trim() ?? '';
+
       cards.add(
-        _CollectionCard(imageUrl: _getFullUrl(imagePath), title: cardTitle),
+        _CollectionCard(
+          imageUrl: _getFullUrl(imageUrl),
+          title: cardTitle,
+        ),
       );
     }
 
+    // Fallback: extract images and titles separately
     if (cards.isEmpty) {
-      // Try alternative pattern for images
-      final imgPattern = RegExp(r'data-src="([^"]*)"');
-      final titlePattern = RegExp(r'<h3[^>]*>(.*?)</h3>');
-
-      final images = imgPattern
-          .allMatches(html)
-          .map((m) => m.group(1) ?? '')
-          .toList();
+      final images = _extractAllImageUrls(html);
       final titles = titlePattern
           .allMatches(html)
           .map((m) => m.group(1)?.trim() ?? '')
@@ -86,10 +145,22 @@ class StaticContentWidget extends StatelessWidget {
 
       for (int i = 0; i < images.length && i < titles.length; i++) {
         cards.add(
-          _CollectionCard(imageUrl: _getFullUrl(images[i]), title: titles[i]),
+          _CollectionCard(
+            imageUrl: _getFullUrl(images[i]),
+            title: titles[i],
+          ),
         );
       }
+
+      // If we have images but no titles, still show them
+      if (cards.isEmpty && images.isNotEmpty) {
+        for (final img in images) {
+          cards.add(_CollectionCard(imageUrl: _getFullUrl(img), title: ''));
+        }
+      }
     }
+
+    if (cards.isEmpty) return const SizedBox.shrink();
 
     return Column(
       children: [
@@ -167,21 +238,22 @@ class StaticContentWidget extends StatelessWidget {
           ),
         ),
         // Title overlay at bottom
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 20,
-          child: Text(
-            card.title,
-            style: TextStyle(
-              fontFamily: 'DM Serif Display',
-              fontSize: 20,
-              fontWeight: FontWeight.w400,
-              color: isDark ? AppColors.neutral100 : AppColors.neutral900,
+        if (card.title.isNotEmpty)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 20,
+            child: Text(
+              card.title,
+              style: TextStyle(
+                fontFamily: 'DM Serif Display',
+                fontSize: 20,
+                fontWeight: FontWeight.w400,
+                color: isDark ? AppColors.neutral100 : AppColors.neutral900,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
-        ),
       ],
     );
   }
@@ -190,9 +262,8 @@ class StaticContentWidget extends StatelessWidget {
   /// An inline layout with image on one side and content on the other
   Widget _buildBoldCollections(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    // Extract image
-    final imgMatch = RegExp(r'data-src="([^"]*)"').firstMatch(html);
-    final imageUrl = _getFullUrl(imgMatch?.group(1) ?? '');
+    // Extract image — prefer data-src over src
+    final imageUrl = _getFullUrl(_extractBestImageUrl(html));
 
     // Extract title
     final titleMatch = RegExp(
@@ -320,25 +391,30 @@ class StaticContentWidget extends StatelessWidget {
 
   /// Build services grid layout
   Widget _buildServicesGrid(BuildContext context) {
-    // Extract service cards
-    final cardPattern = RegExp(
-      r'<div class="service-card"[^>]*>.*?'
-      r'<img[^>]*data-src="([^"]*)"[^>]*>.*?'
-      r'<h3[^>]*>(.*?)</h3>.*?'
-      r'<p[^>]*>(.*?)</p>.*?'
-      r'</div>',
+    // Extract service cards — find each card block
+    final cardBlockPattern = RegExp(
+      r'<div class="service-card"[^>]*>(.*?)</div>',
       dotAll: true,
     );
+    final titlePattern = RegExp(r'<h3[^>]*>(.*?)</h3>', dotAll: true);
+    final descPattern = RegExp(r'<p[^>]*>(.*?)</p>', dotAll: true);
 
     final services = <_ServiceCard>[];
-    for (final match in cardPattern.allMatches(html)) {
-      services.add(
-        _ServiceCard(
-          imageUrl: _getFullUrl(match.group(1) ?? ''),
-          title: match.group(2)?.trim() ?? '',
-          description: match.group(3)?.trim() ?? '',
-        ),
-      );
+    for (final block in cardBlockPattern.allMatches(html)) {
+      final blockHtml = block.group(0) ?? '';
+      final imageUrl = _extractBestImageUrl(blockHtml);
+      final cardTitle = titlePattern.firstMatch(blockHtml)?.group(1)?.trim() ?? '';
+      final cardDesc = descPattern.firstMatch(blockHtml)?.group(1)?.trim() ?? '';
+
+      if (imageUrl.isNotEmpty || cardTitle.isNotEmpty) {
+        services.add(
+          _ServiceCard(
+            imageUrl: _getFullUrl(imageUrl),
+            title: cardTitle,
+            description: cardDesc,
+          ),
+        );
+      }
     }
 
     if (services.isEmpty) return const SizedBox.shrink();
@@ -412,13 +488,9 @@ class StaticContentWidget extends StatelessWidget {
     );
   }
 
-  /// Generic content fallback - extract and display images
+  /// Generic content fallback - extract and display images from <img> tags
   Widget _buildGenericContent(BuildContext context) {
-    final imgPattern = RegExp(r'(?:src|data-src)="([^"]*)"');
-    final images = imgPattern
-        .allMatches(html)
-        .map((m) => m.group(1) ?? '')
-        .toList();
+    final images = _extractAllImageUrls(html);
 
     if (images.isEmpty) return const SizedBox.shrink();
 
@@ -496,6 +568,10 @@ class StaticContentWidget extends StatelessWidget {
       },
     );
   }
+
+  // ──────────────────────────────────────────────────────────────────────
+  // URL HELPERS
+  // ──────────────────────────────────────────────────────────────────────
 
   String _getFullUrl(String path) {
     if (path.isEmpty) return '';

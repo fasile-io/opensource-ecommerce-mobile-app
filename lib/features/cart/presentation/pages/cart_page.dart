@@ -73,6 +73,11 @@ class _CartPageState extends State<CartPage> {
   Widget build(BuildContext context) {
     return BlocConsumer<CartBloc, CartState>(
       listener: (context, state) {
+        // Clear coupon input when cart has no coupon applied
+        // (covers: invalid code, cart emptied, coupon removed, new session)
+        if (!state.cart.hasCoupon) {
+          _couponController.clear();
+        }
         if (state.successMessage != null) {
           _showToast(
             context,

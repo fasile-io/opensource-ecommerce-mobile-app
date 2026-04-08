@@ -1,4 +1,6 @@
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/locale/locale_cubit.dart';
 import '../../../../core/graphql/queries.dart';
 import '../models/home_models.dart';
 
@@ -15,10 +17,14 @@ class HomeRepository {
 
   /// Fetches the theme customization entries that define homepage sections.
   Future<List<ThemeCustomization>> fetchThemeCustomizations() async {
+    // Read the user's preferred locale for selecting the right translation
+    final prefs = await SharedPreferences.getInstance();
+    final locale = prefs.getString(LocaleCubit.localeKey) ?? 'en';
+
     final result = await _client.query(
       QueryOptions(
         document: gql(ThemeQueries.getThemeCustomization),
-        variables: const {'first': 20},
+        variables: const {'first': 50},
         fetchPolicy: FetchPolicy.cacheAndNetwork,
       ),
     );
@@ -32,7 +38,10 @@ class HomeRepository {
     final edges = result.data?['themeCustomizations']?['edges'] as List? ?? [];
     return edges
         .map(
-          (e) => ThemeCustomization.fromJson(e['node'] as Map<String, dynamic>),
+          (e) => ThemeCustomization.fromJson(
+            e['node'] as Map<String, dynamic>,
+            preferredLocale: locale,
+          ),
         )
         .where((tc) => tc.status)
         .toList()

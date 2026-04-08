@@ -353,13 +353,16 @@ class RecentOrder {
   });
 
   factory RecentOrder.fromJson(Map<String, dynamic> json) {
-    // Parse item count from items edges
-    int count = 0;
+    // Use totalItemCount from the order (available in customerOrders query).
+    // Falls back to counting items edges if present (order detail query).
     final items = json['items'];
-    if (items is Map && items['edges'] is List) {
-      count = (items['edges'] as List).length;
-    } else if (items is List) {
-      count = items.length;
+    int count = _parseInt(json['totalItemCount']) ?? 0;
+    if (count == 0) {
+      if (items is Map && items['edges'] is List) {
+        count = (items['edges'] as List).length;
+      } else if (items is List) {
+        count = items.length;
+      }
     }
 
     // Parse grand total

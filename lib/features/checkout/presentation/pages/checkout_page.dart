@@ -188,6 +188,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                 backgroundColor: Colors.red,
               ),
             );
+            _couponController.clear();
             context.read<CheckoutBloc>().add(ClearCheckoutMessage());
           }
           if (state.successMessage != null &&
@@ -1017,8 +1018,12 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             ),
             const SizedBox(height: 12),
             _buildSameAddressCheckbox(context),
-            const SizedBox(height: 16),
-            _buildSaveAddressButton(context, state),
+            // Only show Save button here if using same address for shipping.
+            // Otherwise it appears after the shipping form.
+            if (_useSameAddress) ...[
+              const SizedBox(height: 16),
+              _buildSaveAddressButton(context, state),
+            ],
           ],
         ),
       ),
@@ -1171,6 +1176,8 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
               _shippingCompanyCtrl,
               AppLocalizations.of(context)!.checkoutCompanyOptional,
             ),
+            const SizedBox(height: 16),
+            _buildSaveAddressButton(context, state),
           ],
         ),
       ),
