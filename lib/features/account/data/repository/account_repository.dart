@@ -43,7 +43,9 @@ class AccountRepository {
 
     final edges = result.data?['locales']?['edges'] as List<dynamic>? ?? [];
     final locales = edges
-        .map((edge) => ShopLocale.fromJson(edge['node'] as Map<String, dynamic>))
+        .map(
+          (edge) => ShopLocale.fromJson(edge['node'] as Map<String, dynamic>),
+        )
         .toList();
 
     _logAccountApiMessage(
@@ -468,14 +470,14 @@ class AccountRepository {
 
   /// Delete a customer address
   /// Uses createDeleteCustomerAddress mutation with input type createDeleteCustomerAddressInput.
-  Future<void> deleteAddress({required String addressId}) async {
+  Future<void> deleteAddress({required int addressId}) async {
     debugPrint('🗑️ AccountRepo.deleteAddress (id=$addressId)');
 
     final result = await client.mutate(
       MutationOptions(
         document: gql(AccountQueries.deleteCustomerAddress),
         variables: {
-          'input': {'id': addressId},
+          'input': {'addressId': addressId},
         },
       ),
     );

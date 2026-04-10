@@ -80,7 +80,7 @@ class SetDefaultAddress extends AddressBookEvent {
 
 /// Delete an address
 class DeleteAddress extends AddressBookEvent {
-  final String addressId;
+  final int addressId;
 
   const DeleteAddress({required this.addressId});
 
@@ -316,7 +316,7 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
 
     try {
       // Find the address in state if fields are null
-      final address = state.addresses.firstWhere(
+      state.addresses.firstWhere(
         (a) => a.numericId == event.addressId,
         orElse: () => throw Exception('Selected address not found in state'),
       );
@@ -371,7 +371,7 @@ class AddressBookBloc extends Bloc<AddressBookEvent, AddressBookState> {
 
       // Remove from local list
       final updatedAddresses = state.addresses
-          .where((a) => a.id != event.addressId)
+          .where((a) => a.numericId != event.addressId)
           .toList();
 
       emit(

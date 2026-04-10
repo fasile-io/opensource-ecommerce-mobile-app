@@ -177,11 +177,10 @@ class AccountQueries {
   /// Delete customer address
   /// Bagisto API mutation: createDeleteCustomerAddress(input: createDeleteCustomerAddressInput!)
   static const String deleteCustomerAddress = r'''
-    mutation createDeleteCustomerAddress($input: createDeleteCustomerAddressInput!) {
+    mutation deleteCustomerAddress($input: createDeleteCustomerAddressInput!) {
       createDeleteCustomerAddress(input: $input) {
         deleteCustomerAddress {
-          status
-          message
+          id
         }
       }
     }
@@ -837,7 +836,7 @@ class AccountQueries {
   /// Bagisto API mutation: createReorderOrder(input: reorderOrderInput!)
   /// Required: orderId (Int)
   /// Returns: success, message, orderId, itemsAddedCount
- static const String reorderOrder = r'''
+  static const String reorderOrder = r'''
 mutation createReorderOrder($input: createReorderOrderInput!) {
   createReorderOrder(input: $input) {
     reorderOrder {

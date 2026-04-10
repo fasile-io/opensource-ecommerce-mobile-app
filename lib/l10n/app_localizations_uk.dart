@@ -1388,6 +1388,13 @@ class AppLocalizationsUk extends AppLocalizations {
   String get accountDelete => 'Видалити';
 
   @override
+  String get accountDeleteAddress => 'Delete Address';
+
+  @override
+  String get accountDeleteAddressConfirm =>
+      'Are you sure you want to delete this address?';
+
+  @override
   String get accountGenderMale => 'Чоловіча';
 
   @override

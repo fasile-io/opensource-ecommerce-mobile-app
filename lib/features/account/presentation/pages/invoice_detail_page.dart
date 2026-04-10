@@ -77,7 +77,9 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
       });
 
       try {
-        final invoice = await widget.repository!.getCustomerInvoice(widget.invoice.numericId!);
+        final invoice = await widget.repository!.getCustomerInvoice(
+          widget.invoice.numericId!,
+        );
         setState(() {
           _fetchedInvoice = invoice;
           _isLoading = false;
@@ -121,53 +123,56 @@ class _InvoiceDetailPageState extends State<InvoiceDetailPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? _buildErrorState(isDark)
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 8),
+          ? _buildErrorState(isDark)
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
 
-                      // ─── Info Grid ───
-                      _InvoiceInfoGrid(
-                        invoice: _displayInvoice,
-                        order: widget.order,
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Download Invoice Button
-                      if ((_displayInvoice.downloadUrl != null &&
-                              _displayInvoice.downloadUrl!.isNotEmpty) ||
-                          _displayInvoice.numericId != null)
-                        _DownloadButton(
-                          invoice: _displayInvoice,
-                          downloadUrl: _displayInvoice.downloadUrl ?? '',
-                        ),
-
-                      const SizedBox(height: 24),
-
-                      // ─── Items Section ───
-                      _InvoiceItemsSection(
-                        invoice: _displayInvoice,
-                        order: widget.order,
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // ─── Price Break ───
-                      _InvoicePriceBreak(invoice: _displayInvoice, order: widget.order),
-
-                      const SizedBox(height: 24),
-
-                      // ─── Address & Method Cards ───
-                      _InvoiceInfoCards(order: widget.order),
-
-                      const SizedBox(height: 32),
-                    ],
+                  // ─── Info Grid ───
+                  _InvoiceInfoGrid(
+                    invoice: _displayInvoice,
+                    order: widget.order,
                   ),
-                ),
+
+                  const SizedBox(height: 16),
+
+                  // Download Invoice Button
+                  if ((_displayInvoice.downloadUrl != null &&
+                          _displayInvoice.downloadUrl!.isNotEmpty) ||
+                      _displayInvoice.numericId != null)
+                    _DownloadButton(
+                      invoice: _displayInvoice,
+                      downloadUrl: _displayInvoice.downloadUrl ?? '',
+                    ),
+
+                  const SizedBox(height: 24),
+
+                  // ─── Items Section ───
+                  _InvoiceItemsSection(
+                    invoice: _displayInvoice,
+                    order: widget.order,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ─── Price Break ───
+                  _InvoicePriceBreak(
+                    invoice: _displayInvoice,
+                    order: widget.order,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ─── Address & Method Cards ───
+                  _InvoiceInfoCards(order: widget.order),
+
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
     );
   }
 
@@ -272,25 +277,11 @@ class _InvoiceInfoGrid extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        // Row 3: Order Status | Channel
-        Row(
-          children: [
-            Expanded(
-              child: _InfoPair(
-                label: l10n.accountOrderStatus,
-                value: order.statusLabel,
-                isDark: isDark,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _InfoPair(
-                label: l10n.accountChannel,
-                value: order.channelName ?? l10n.accountDefault,
-                isDark: isDark,
-              ),
-            ),
-          ],
+        // Row 3: Order Status
+        _InfoPair(
+          label: l10n.accountOrderStatus,
+          value: order.statusLabel,
+          isDark: isDark,
         ),
       ],
     );
@@ -396,10 +387,7 @@ class _InvoiceItemsSection extends StatefulWidget {
   final OrderInvoice invoice;
   final OrderDetail order;
 
-  const _InvoiceItemsSection({
-    required this.invoice,
-    required this.order,
-  });
+  const _InvoiceItemsSection({required this.invoice, required this.order});
 
   @override
   State<_InvoiceItemsSection> createState() => _InvoiceItemsSectionState();
@@ -572,11 +560,23 @@ class _InvoiceItemCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _qtyRow(l10n.accountOrderedQty, orderItem.qtyOrdered, isDark),
+                    _qtyRow(
+                      l10n.accountOrderedQty,
+                      orderItem.qtyOrdered,
+                      isDark,
+                    ),
                     const SizedBox(height: 6),
-                    _qtyRow(l10n.accountShippedQty, orderItem.qtyShipped, isDark),
+                    _qtyRow(
+                      l10n.accountShippedQty,
+                      orderItem.qtyShipped,
+                      isDark,
+                    ),
                     const SizedBox(height: 6),
-                    _qtyRow(l10n.accountInvoicedQty, orderItem.qtyInvoiced, isDark),
+                    _qtyRow(
+                      l10n.accountInvoicedQty,
+                      orderItem.qtyInvoiced,
+                      isDark,
+                    ),
                   ],
                 ),
               ),
@@ -669,17 +669,13 @@ class _InvoiceItemCard extends StatelessWidget {
     // Try to build options string from 'attributes' or 'options'
     final attrs = additional['attributes'];
     if (attrs is Map) {
-      return attrs.entries
-          .map((e) => '${e.key}: ${e.value}')
-          .join('\n');
+      return attrs.entries.map((e) => '${e.key}: ${e.value}').join('\n');
     }
 
     // For configurable products, try super_attribute
     final superAttr = additional['super_attribute'];
     if (superAttr is Map) {
-      return superAttr.entries
-          .map((e) => '${e.value}')
-          .join('-');
+      return superAttr.entries.map((e) => '${e.value}').join('-');
     }
 
     return '';
@@ -781,11 +777,7 @@ class _InvoicePriceBreak extends StatelessWidget {
           isDark,
         ),
         const SizedBox(height: 6),
-        _priceRow(
-          l10n.accountTotalDue,
-          _formatAmount(order.totalDue),
-          isDark,
-        ),
+        _priceRow(l10n.accountTotalDue, _formatAmount(order.totalDue), isDark),
       ],
     );
   }
@@ -857,7 +849,10 @@ class _InvoiceInfoCards extends StatelessWidget {
         // Shipping Method
         _InvoiceInfoCard(
           title: l10n.accountShippingMethod,
-          name: order.shippingTitle ?? order.shippingMethod ?? l10n.accountNotAvailable,
+          name:
+              order.shippingTitle ??
+              order.shippingMethod ??
+              l10n.accountNotAvailable,
           details: order.shippingTitle ?? order.shippingMethod,
         ),
         const SizedBox(height: 8),
@@ -865,7 +860,10 @@ class _InvoiceInfoCards extends StatelessWidget {
         // Payment Method
         _InvoiceInfoCard(
           title: l10n.accountPaymentMethod,
-          name: order.payment?.methodTitle ?? order.payment?.method ?? l10n.accountNotAvailable,
+          name:
+              order.payment?.methodTitle ??
+              order.payment?.method ??
+              l10n.accountNotAvailable,
           details: null,
         ),
       ],
@@ -963,10 +961,7 @@ class _DownloadButton extends StatefulWidget {
   final OrderInvoice invoice;
   final String downloadUrl;
 
-  const _DownloadButton({
-    required this.invoice,
-    required this.downloadUrl,
-  });
+  const _DownloadButton({required this.invoice, required this.downloadUrl});
 
   @override
   State<_DownloadButton> createState() => _DownloadButtonState();
@@ -1034,9 +1029,7 @@ class _DownloadButtonState extends State<_DownloadButton> {
                 ),
               ),
               const SizedBox(width: 12),
-              Expanded(
-                child: Text(l10n.accountDownloadWillStartShortly),
-              ),
+              Expanded(child: Text(l10n.accountDownloadWillStartShortly)),
             ],
           ),
           duration: const Duration(seconds: 30),
@@ -1051,10 +1044,11 @@ class _DownloadButtonState extends State<_DownloadButton> {
       }
 
       final dir = await getApplicationDocumentsDirectory();
-      final invoiceNumber = (widget.invoice.incrementId ??
-              widget.invoice.numericId?.toString() ??
-              'invoice')
-          .replaceAll(RegExp(r'[^\w\-]'), '_');
+      final invoiceNumber =
+          (widget.invoice.incrementId ??
+                  widget.invoice.numericId?.toString() ??
+                  'invoice')
+              .replaceAll(RegExp(r'[^\w\-]'), '_');
       final savePath = '${dir.path}/invoice-$invoiceNumber.pdf';
       final resolvedDownloadUrl = _buildInvoiceDownloadUrl();
       final requestHeaders = <String, String>{
@@ -1131,8 +1125,8 @@ class _DownloadButtonState extends State<_DownloadButton> {
       final message = e is DioException
           ? _dioErrorMessage(e)
           : e is _InvoiceDownloadException
-              ? e.message
-              : e.toString();
+          ? e.message
+          : e.toString();
 
       scaffoldMessenger
         ..hideCurrentSnackBar()

@@ -33,6 +33,22 @@ class ProductInfoSection extends StatelessWidget {
             ),
           ),
 
+          // ── Short Description (configurable products only) ──
+          if (product.isConfigurable &&
+              product.shortDescription != null &&
+              product.shortDescription!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _stripHtml(product.shortDescription!),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.bodyText(context).copyWith(
+                  color: isDark ? AppColors.neutral400 : AppColors.neutral600,
+                ),
+              ),
+            ),
+
           const SizedBox(height: 12),
 
           // ── Price Row ──
@@ -48,6 +64,17 @@ class ProductInfoSection extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _stripHtml(String html) {
+    return html
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .trim();
   }
 
   Widget _buildPriceRow(BuildContext context) {
@@ -75,10 +102,7 @@ class ProductInfoSection extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // Current price (Text-1: 24px bold)
-        Text(
-          displayPriceLabel,
-          style: AppTextStyles.text1(context),
-        ),
+        Text(displayPriceLabel, style: AppTextStyles.text1(context)),
 
         // Original price strikethrough
         if (originalPrice != null)

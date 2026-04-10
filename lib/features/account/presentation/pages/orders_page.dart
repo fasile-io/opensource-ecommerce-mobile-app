@@ -24,7 +24,7 @@ import '../../../../core/widgets/app_back_button.dart';
 ///   Fraud:      bg #FFE2E2, border #FFC9C9, text #FB2C36
 ///
 /// Architecture:
-///   BlocProvider<OrdersBloc> → OrdersPage → Repository → GraphQL
+///   `BlocProvider<OrdersBloc> -> OrdersPage -> Repository -> GraphQL`
 class OrdersPage extends StatelessWidget {
   const OrdersPage({super.key});
 
@@ -292,7 +292,7 @@ class _CountHeader extends StatelessWidget {
         children: [
           // "N Orders" — Figma: Roboto Medium 12, #171717
           Text(
-            '${totalCount} ${totalCount == 1 ? l10n.accountOrderSingular : l10n.accountOrderPlural}',
+            '$totalCount ${totalCount == 1 ? l10n.accountOrderSingular : l10n.accountOrderPlural}',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w500,
@@ -373,7 +373,10 @@ class _OrderCard extends StatelessWidget {
 
                 // Price + items — Figma: Roboto Regular 14, #525252
                 Text(
-                  l10n.accountOrderTotalItems(order.formattedTotal, order.totalItemCount),
+                  l10n.accountOrderTotalItems(
+                    order.formattedTotal,
+                    order.totalItemCount,
+                  ),
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Roboto',

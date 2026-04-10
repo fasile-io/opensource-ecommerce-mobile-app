@@ -401,13 +401,16 @@ class RecentOrder {
 
   String get orderNumber {
     if (incrementId != null) {
-      return '#${incrementId.toString().padLeft(8, '0')}';
+      return '#$incrementId';
     }
     return '#${id ?? '0'}';
   }
 
   String get formattedTotal {
-    return CurrencyFormatter.formatAmount(grandTotal, currencyCode: currencyCode);
+    return CurrencyFormatter.formatAmount(
+      grandTotal,
+      currencyCode: currencyCode,
+    );
   }
 
   String get formattedDate {
@@ -562,8 +565,11 @@ class WishlistItem {
 
   String get formattedPrice =>
       apiFormattedPrice ?? CurrencyFormatter.formatAmount(price);
-  String? get formattedSpecialPrice => apiFormattedSpecialPrice ??
-      (specialPrice != null ? CurrencyFormatter.formatAmount(specialPrice) : null);
+  String? get formattedSpecialPrice =>
+      apiFormattedSpecialPrice ??
+      (specialPrice != null
+          ? CurrencyFormatter.formatAmount(specialPrice)
+          : null);
 }
 
 // ─── Product Review ───
@@ -622,7 +628,8 @@ class ProductReview {
           }
         } else if (images is List && images.isNotEmpty) {
           // Legacy flat list format
-          pImage = images.first['url']?.toString() ??
+          pImage =
+              images.first['url']?.toString() ??
               images.first['path']?.toString();
         }
       }
@@ -1019,11 +1026,7 @@ class OrderInfo {
   final String? incrementId;
   final String? status;
 
-  const OrderInfo({
-    this.id,
-    this.incrementId,
-    this.status,
-  });
+  const OrderInfo({this.id, this.incrementId, this.status});
 
   factory OrderInfo.fromJson(Map<String, dynamic> json) {
     return OrderInfo(
@@ -1209,8 +1212,11 @@ class CompareItem {
 
   String get formattedPrice =>
       apiFormattedPrice ?? CurrencyFormatter.formatAmount(price);
-  String? get formattedSpecialPrice => apiFormattedSpecialPrice ??
-      (specialPrice != null ? CurrencyFormatter.formatAmount(specialPrice) : null);
+  String? get formattedSpecialPrice =>
+      apiFormattedSpecialPrice ??
+      (specialPrice != null
+          ? CurrencyFormatter.formatAmount(specialPrice)
+          : null);
 }
 
 // ─── Helpers ───
@@ -1751,12 +1757,25 @@ class OrderShipment {
     );
   }
 
-  /// Formatted shipment number like "#000000003"
+  /// Uses the API shipping number when available, otherwise falls back to IDs.
   String get shipmentNumber {
-    if (numericId != null) {
-      return '#${numericId.toString().padLeft(9, '0')}';
+    final rawShippingNumber = shippingNumber?.trim();
+    if (rawShippingNumber != null && rawShippingNumber.isNotEmpty) {
+      return rawShippingNumber.startsWith('#')
+          ? rawShippingNumber
+          : '#$rawShippingNumber';
     }
-    return id ?? '';
+
+    if (numericId != null) {
+      return '#$numericId';
+    }
+
+    final rawId = id?.trim();
+    if (rawId != null && rawId.isNotEmpty) {
+      return rawId.startsWith('#') ? rawId : '#$rawId';
+    }
+
+    return '';
   }
 
   /// Formatted date: "8 Oct 2025"
@@ -2114,7 +2133,9 @@ class CmsPageTranslation {
   factory CmsPageTranslation.fromJson(Map<String, dynamic> json) {
     return CmsPageTranslation(
       id: json['id']?.toString(),
-      numericId: json['_id'] is int ? json['_id'] : int.tryParse(json['_id']?.toString() ?? ''),
+      numericId: json['_id'] is int
+          ? json['_id']
+          : int.tryParse(json['_id']?.toString() ?? ''),
       pageTitle: json['pageTitle']?.toString() ?? '',
       urlKey: json['urlKey']?.toString() ?? '',
       htmlContent: json['htmlContent']?.toString() ?? '',
@@ -2153,14 +2174,16 @@ class CmsPage {
   factory CmsPage.fromJson(Map<String, dynamic> json) {
     // Handle translation as either a single object or within edges
     Map<String, dynamic> translationData = {};
-    
+
     if (json['translation'] is Map) {
       translationData = json['translation'];
     }
 
     return CmsPage(
       id: json['id']?.toString(),
-      numericId: json['_id'] is int ? json['_id'] : int.tryParse(json['_id']?.toString() ?? ''),
+      numericId: json['_id'] is int
+          ? json['_id']
+          : int.tryParse(json['_id']?.toString() ?? ''),
       layout: json['layout']?.toString(),
       createdAt: json['createdAt']?.toString(),
       updatedAt: json['updatedAt']?.toString(),
@@ -2220,10 +2243,7 @@ class ContactUsResponse {
   final bool success;
   final String message;
 
-  const ContactUsResponse({
-    required this.success,
-    required this.message,
-  });
+  const ContactUsResponse({required this.success, required this.message});
 
   factory ContactUsResponse.fromJson(Map<String, dynamic> json) {
     return ContactUsResponse(

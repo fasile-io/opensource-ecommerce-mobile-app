@@ -1,5 +1,11 @@
 #### This changelog consists the bug & security fixes and new features being included in the releases listed below
 
+# CHANGELOG for v2.4.3
+
+## **v2.4.3 (10th of April, 2026)** - *Release*
+
+* [Improvement] Fixed bugs to improve overall stability and performance
+
 # CHANGELOG for v2.4.2
 
 ## **v2.4.2 (8th of April, 2026)** - *Release*

@@ -2664,6 +2664,18 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get accountDelete;
 
+  /// No description provided for @accountDeleteAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Address'**
+  String get accountDeleteAddress;
+
+  /// No description provided for @accountDeleteAddressConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this address?'**
+  String get accountDeleteAddressConfirm;
+
   /// No description provided for @accountGenderMale.
   ///
   /// In en, this message translates to:

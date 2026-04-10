@@ -264,6 +264,25 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     }
   }
 
+  Future<CartState> _createFreshGuestCartState({String? successMessage}) async {
+    repository.updateToken(null, isGuest: true);
+    final response = await repository.createCartToken();
+    final token = response.sessionToken ?? response.cartToken;
+    final cartId = response.id;
+
+    await _saveGuestSession(token, cartId);
+    repository.updateToken(token, isGuest: true);
+
+    return CartState(
+      status: CartStatus.loaded,
+      cartToken: token,
+      cartId: cartId,
+      isGuest: true,
+      cart: CartModel.empty,
+      successMessage: successMessage,
+    );
+  }
+
   // ─── Token resolution ───────────────────────────────────────────────
 
   /// Ensure we have a valid token. For guests, creates a cart token if needed.
@@ -290,12 +309,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
           '[CartBloc] _ensureToken: user is logged in, using auth token',
         );
         repository.updateToken(authToken, isGuest: false);
-        emit(
-          state.copyWith(
-            cartToken: authToken,
-            isGuest: false,
-          ),
-        );
+        emit(state.copyWith(cartToken: authToken, isGuest: false));
         return authToken;
       }
       debugPrint(
@@ -449,21 +463,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         debugPrint('[CartBloc] Stale guest cart — creating fresh session');
         await _clearGuestSession();
         try {
-          repository.updateToken(null, isGuest: true);
-          final response = await repository.createCartToken();
-          final newToken = response.sessionToken ?? response.cartToken;
-          final newCartId = response.id;
-          await _saveGuestSession(newToken, newCartId);
-          repository.updateToken(newToken, isGuest: true);
-          emit(
-            CartState(
-              status: CartStatus.loaded,
-              cartToken: newToken,
-              cartId: newCartId,
-              isGuest: true,
-              cart: CartModel.empty,
-            ),
-          );
+          emit(await _createFreshGuestCartState());
           return;
         } catch (e2) {
           debugPrint('[CartBloc] Failed to create fresh guest session: $e2');
@@ -568,20 +568,43 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     emit(state.copyWith(updatingItemId: event.cartItemId));
     try {
       _syncRepoToken();
-      await repository.removeCartItem(
+      final updatedCart = await repository.removeCartItem(
         cartItemId: event.cartItemId,
       );
-      final freshCart = await repository.getCart();
 
-      // If cart is now empty and we're a guest, reset the guest session
-      if (freshCart.itemsQty == 0 && state.isGuest) {
-        await _clearGuestSession();
+      if (updatedCart.itemsQty == 0 || updatedCart.items.isEmpty) {
+        if (state.isGuest) {
+          await _clearGuestSession();
+          try {
+            emit(
+              await _createFreshGuestCartState(
+                successMessage: 'Item removed from cart',
+              ),
+            );
+          } catch (sessionError) {
+            debugPrint(
+              '[CartBloc] Failed to recreate guest session after last-item removal: $sessionError',
+            );
+            emit(
+              const CartState(
+                status: CartStatus.loaded,
+                isGuest: true,
+                cart: CartModel.empty,
+                successMessage: 'Item removed from cart',
+              ),
+            );
+          }
+          return;
+        }
+
         emit(
-          const CartState(
+          state.copyWith(
             status: CartStatus.loaded,
-            isGuest: true,
             cart: CartModel.empty,
+            clearCartId: true,
+            clearUpdatingItem: true,
             successMessage: 'Item removed from cart',
+            clearError: true,
           ),
         );
         return;
@@ -590,8 +613,8 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       emit(
         state.copyWith(
           status: CartStatus.loaded,
-          cart: freshCart,
-          cartId: freshCart.id > 0 ? freshCart.id : state.cartId,
+          cart: updatedCart,
+          cartId: updatedCart.id > 0 ? updatedCart.id : state.cartId,
           clearUpdatingItem: true,
           successMessage: 'Item removed from cart',
           clearError: true,
@@ -599,6 +622,45 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       );
     } catch (e) {
       debugPrint('[CartBloc] RemoveFromCart error: $e');
+
+      if (e.toString().contains('Cart not found')) {
+        if (state.isGuest) {
+          await _clearGuestSession();
+          try {
+            emit(
+              await _createFreshGuestCartState(
+                successMessage: 'Item removed from cart',
+              ),
+            );
+          } catch (sessionError) {
+            debugPrint(
+              '[CartBloc] Failed to recreate guest session after stale-cart removal: $sessionError',
+            );
+            emit(
+              const CartState(
+                status: CartStatus.loaded,
+                isGuest: true,
+                cart: CartModel.empty,
+                successMessage: 'Item removed from cart',
+              ),
+            );
+          }
+          return;
+        }
+
+        emit(
+          state.copyWith(
+            status: CartStatus.loaded,
+            cart: CartModel.empty,
+            clearCartId: true,
+            clearUpdatingItem: true,
+            successMessage: 'Item removed from cart',
+            clearError: true,
+          ),
+        );
+        return;
+      }
+
       emit(
         state.copyWith(
           clearUpdatingItem: true,
@@ -711,7 +773,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
   /// CRITICAL: Called when user logs out.
   ///
   /// Flow (matching Next.js reference):
-  ///  1. Clear the logged-in cart state
+  ///  1. Reset local cart state
   ///  2. Create a fresh guest session
   ///  3. Load the (empty) guest cart
   Future<void> _onUserLoggedOut(
@@ -722,20 +784,6 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
     // Clear the guard flag — we're going back to guest mode
     _loginInProgress = false;
-
-    // Best-effort: clear server-side cart items for logged-in session
-    // before switching to guest mode.
-    final itemsToRemove = List<CartItemModel>.from(state.cart.items);
-    if (!state.isGuest && itemsToRemove.isNotEmpty) {
-      for (final item in itemsToRemove) {
-        try {
-          _syncRepoToken();
-          await repository.removeCartItem(cartItemId: item.id);
-        } catch (e) {
-          debugPrint('[CartBloc] OnUserLoggedOut remove item failed: $e');
-        }
-      }
-    }
 
     await _clearGuestSession();
 

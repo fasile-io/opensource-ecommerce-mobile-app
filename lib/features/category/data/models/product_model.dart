@@ -401,8 +401,7 @@ class ProductModel {
   ProductVariant? findVariantById(int variantId) {
     if (variants.isEmpty) return null;
     for (final variant in variants) {
-      final vid = variant.numericId ??
-          int.tryParse(variant.id.split('/').last);
+      final vid = variant.numericId ?? int.tryParse(variant.id.split('/').last);
       if (vid == variantId) return variant;
     }
     return null;
@@ -1011,6 +1010,7 @@ class BookingEventTicket {
   });
 
   factory BookingEventTicket.fromJson(Map<String, dynamic> json) {
+    final translation = json['translation'] as Map<String, dynamic>?;
     return BookingEventTicket(
       id: json['id']?.toString() ?? '',
       numericId: ProductModel._parseInt(json['_id']),
@@ -1020,8 +1020,10 @@ class BookingEventTicket {
       qty: ProductModel._parseInt(json['qty']) ?? 0,
       specialPrice: ProductModel._parseSpecialPrice(json['specialPrice']),
       formattedSpecialPrice: json['formattedSpecialPrice'] as String?,
-      name: json['name']?.toString(),
-      description: json['description']?.toString(),
+      name: json['name']?.toString() ?? translation?['name']?.toString(),
+      description:
+          json['description']?.toString() ??
+          translation?['description']?.toString(),
     );
   }
 

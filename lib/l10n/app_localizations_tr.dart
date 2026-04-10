@@ -1386,6 +1386,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get accountDelete => 'Sil';
 
   @override
+  String get accountDeleteAddress => 'Delete Address';
+
+  @override
+  String get accountDeleteAddressConfirm =>
+      'Are you sure you want to delete this address?';
+
+  @override
   String get accountGenderMale => 'Erkek';
 
   @override

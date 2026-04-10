@@ -1390,6 +1390,13 @@ class AppLocalizationsNl extends AppLocalizations {
   String get accountDelete => 'Verwijderen';
 
   @override
+  String get accountDeleteAddress => 'Delete Address';
+
+  @override
+  String get accountDeleteAddressConfirm =>
+      'Are you sure you want to delete this address?';
+
+  @override
   String get accountGenderMale => 'Man';
 
   @override

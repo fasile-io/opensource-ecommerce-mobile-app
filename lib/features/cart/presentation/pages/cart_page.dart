@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/currency/currency_formatter.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/wishlist/wishlist_cubit.dart';
@@ -589,76 +590,45 @@ class _CartPageState extends State<CartPage> {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          // Wishlist
-                          GestureDetector(
-                            onTap: () async {
-                              final accessToken = await AuthStorage.getToken();
-                              if (accessToken == null || accessToken.isEmpty) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please login to add to wishlist',
+                          BlocBuilder<WishlistCubit, WishlistCubitState>(
+                            builder: (context, wishlistState) {
+                              final isWishlisted =
+                                  item.productId > 0 &&
+                                  wishlistState.isWishlisted(item.productId);
+                              final isWishlistProcessing =
+                                  item.productId > 0 &&
+                                  wishlistState.isProcessing(item.productId);
+
+                              return GestureDetector(
+                                onTap: isUpdating || isWishlistProcessing
+                                    ? null
+                                    : () => _handleWishlistAction(
+                                        context,
+                                        item,
+                                        isWishlisted: isWishlisted,
                                       ),
-                                      backgroundColor: Colors.red,
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                }
-                                return;
-                              }
-                              try {
-                                final client =
-                                    GraphQLClientProvider.authenticatedClient(
-                                      accessToken,
-                                    ).value;
-                                final accountRepo = AccountRepository(
-                                  client: client,
-                                );
-                                // Add to wishlist
-                                await accountRepo.addToWishlist(
-                                  productId: item.productId,
-                                );
-                                // Remove from cart (move to wishlist flow)
-                                if (context.mounted) {
-                                  context.read<CartBloc>().add(
-                                    RemoveFromCart(cartItemId: item.id),
-                                  );
-                                }
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        AppLocalizations.of(
-                                          context,
-                                        )!.cartMovedToWishlist,
+                                child: isWishlistProcessing
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.primary500,
+                                        ),
+                                      )
+                                    : Icon(
+                                        isWishlisted
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        size: 24,
+                                        color: isWishlisted
+                                            ? Colors.red
+                                            : (isDark
+                                                  ? AppColors.neutral400
+                                                  : AppColors.neutral600),
                                       ),
-                                      backgroundColor: AppColors.successGreen,
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Failed to move to wishlist: $e',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                }
-                              }
+                              );
                             },
-                            child: Icon(
-                              Icons.favorite_border,
-                              size: 24,
-                              color: isDark
-                                  ? AppColors.neutral400
-                                  : AppColors.neutral600,
-                            ),
                           ),
                         ],
                       ),
@@ -719,6 +689,77 @@ class _CartPageState extends State<CartPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleWishlistAction(
+    BuildContext context,
+    CartItemModel item, {
+    required bool isWishlisted,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final wishlistCubit = context.read<WishlistCubit>();
+    final cartBloc = context.read<CartBloc>();
+    final accessToken = await AuthStorage.getToken();
+
+    if (accessToken == null || accessToken.isEmpty) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.cartPleaseLoginWishlistAdd),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      if (!isWishlisted) {
+        final result = await wishlistCubit.toggleWishlist(
+          productId: item.productId,
+        );
+
+        if (result != true) {
+          if (mounted && result == null) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(l10n.cartPleaseLoginWishlistAdd),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      if (!mounted) return;
+
+      cartBloc.add(RemoveFromCart(cartItemId: item.id));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.cartMovedToWishlist),
+          backgroundColor: AppColors.successGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n.cartFailedMoveWishlist(
+              ErrorMapper.getUserMessage(e, context: 'moving item to wishlist'),
+            ),
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   /// Stepper button for quantity control
@@ -1062,7 +1103,8 @@ class _CartPageState extends State<CartPage> {
           _buildPriceRow(
             context,
             AppLocalizations.of(context)!.cartSubTotal,
-            cart.formattedSubtotal ?? CurrencyFormatter.formatAmount(cart.subtotal),
+            cart.formattedSubtotal ??
+                CurrencyFormatter.formatAmount(cart.subtotal),
             isDark,
           ),
           const SizedBox(height: 8),
@@ -1085,7 +1127,7 @@ class _CartPageState extends State<CartPage> {
             AppLocalizations.of(context)!.cartDeliveryCharges,
             cart.shippingAmount > 0
                 ? (cart.formattedShippingAmount ??
-                    CurrencyFormatter.formatAmount(cart.shippingAmount))
+                      CurrencyFormatter.formatAmount(cart.shippingAmount))
                 : CurrencyFormatter.formatAmount(0),
             isDark,
           ),
@@ -1097,7 +1139,7 @@ class _CartPageState extends State<CartPage> {
             AppLocalizations.of(context)!.cartTax,
             cart.taxAmount > 0
                 ? (cart.formattedTaxAmount ??
-                    CurrencyFormatter.formatAmount(cart.taxAmount))
+                      CurrencyFormatter.formatAmount(cart.taxAmount))
                 : CurrencyFormatter.formatAmount(0),
             isDark,
           ),
@@ -1219,10 +1261,10 @@ class _CartPageState extends State<CartPage> {
 
             // Pay Now button (Figma: 131px wide, rounded 54)
             GestureDetector(
-              onTap: () {
+              onTap: () async {
                 final cartBloc = context.read<CartBloc>();
                 final authBloc = context.read<AuthBloc>();
-                Navigator.of(context).push(
+                await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => MultiBlocProvider(
                       providers: [
@@ -1233,6 +1275,8 @@ class _CartPageState extends State<CartPage> {
                     ),
                   ),
                 );
+                if (!mounted) return;
+                cartBloc.add(LoadCart());
               },
               child: Container(
                 width: 131,

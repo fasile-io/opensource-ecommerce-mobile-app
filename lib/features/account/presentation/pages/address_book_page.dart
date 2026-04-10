@@ -388,10 +388,10 @@ class _AddressListWithScrollState extends State<_AddressListWithScroll> {
   }
 
   void _onScroll() {
-    final hasScrollableContent =
-        _scrollController.position.maxScrollExtent > 0;
+    final hasScrollableContent = _scrollController.position.maxScrollExtent > 0;
     final atTop = _scrollController.position.pixels <= 0;
-    final atBottom = _scrollController.position.pixels >=
+    final atBottom =
+        _scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 10;
 
     setState(() {
@@ -547,29 +547,57 @@ class _AddressListWithScrollState extends State<_AddressListWithScroll> {
                                 context.read<AddressBookBloc>().add(
                                   SetDefaultAddress(
                                     addressId: numericId,
-                                   
+
                                     useForShipping: address.useForShipping,
                                   ),
                                 );
                               }
                             },
                       onEdit: () {
-                        final repository =
-                            context.read<AccountRepository>();
-                        final bloc =
-                            context.read<AddressBookBloc>();
+                        final repository = context.read<AccountRepository>();
+                        final bloc = context.read<AddressBookBloc>();
                         Navigator.of(context).push<bool>(
                           MaterialPageRoute(
                             builder: (_) => RepositoryProvider.value(
                               value: repository,
                               child: BlocProvider.value(
                                 value: bloc,
-                                child:
-                                    AddAddressPage(editingAddress: address),
+                                child: AddAddressPage(editingAddress: address),
                               ),
                             ),
                           ),
                         );
+                      },
+                      onDelete: () async {
+                        final l10n = AppLocalizations.of(context)!;
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: Text(l10n.accountDeleteAddress),
+                            content: Text(l10n.accountDeleteAddressConfirm),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(false),
+                                child: Text(l10n.cartCancel),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(true),
+                                child: Text(
+                                  l10n.accountDelete,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true && context.mounted) {
+                          final numericId = address.numericId;
+                          if (numericId != null && numericId > 0) {
+                            context.read<AddressBookBloc>().add(
+                              DeleteAddress(addressId: numericId),
+                            );
+                          }
+                        }
                       },
                     );
                   },

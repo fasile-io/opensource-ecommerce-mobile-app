@@ -89,6 +89,7 @@ dependencies:
   flutter_local_notifications: ^17.2.1
 
   # App Version Update
+  in_app_update: ^4.2.5
   upgrader: ^11.3.0
   package_info_plus: ^8.1.0
 

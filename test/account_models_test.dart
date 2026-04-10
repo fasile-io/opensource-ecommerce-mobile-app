@@ -81,7 +81,10 @@ void main() {
       expect(address.zipCode, '90006');
       expect(address.isDefault, true);
       expect(address.useForShipping, false);
-      expect(address.formattedAddress, '3650 Court Street, California, FL, US, 90006');
+      expect(
+        address.formattedAddress,
+        '3650 Court Street, California, FL, US, 90006',
+      );
     });
 
     test('fromJson parses list address', () {
@@ -115,32 +118,52 @@ void main() {
     test('isDefault handles different value types', () {
       expect(
         CustomerAddress.fromJson({
-          'firstName': '', 'lastName': '', 'address': '',
-          'city': '', 'state': '', 'country': '', 'postcode': '',
+          'firstName': '',
+          'lastName': '',
+          'address': '',
+          'city': '',
+          'state': '',
+          'country': '',
+          'postcode': '',
           'defaultAddress': true,
         }).isDefault,
         true,
       );
       expect(
         CustomerAddress.fromJson({
-          'firstName': '', 'lastName': '', 'address': '',
-          'city': '', 'state': '', 'country': '', 'postcode': '',
+          'firstName': '',
+          'lastName': '',
+          'address': '',
+          'city': '',
+          'state': '',
+          'country': '',
+          'postcode': '',
           'defaultAddress': 1,
         }).isDefault,
         true,
       );
       expect(
         CustomerAddress.fromJson({
-          'firstName': '', 'lastName': '', 'address': '',
-          'city': '', 'state': '', 'country': '', 'postcode': '',
+          'firstName': '',
+          'lastName': '',
+          'address': '',
+          'city': '',
+          'state': '',
+          'country': '',
+          'postcode': '',
           'defaultAddress': '1',
         }).isDefault,
         true,
       );
       expect(
         CustomerAddress.fromJson({
-          'firstName': '', 'lastName': '', 'address': '',
-          'city': '', 'state': '', 'country': '', 'postcode': '',
+          'firstName': '',
+          'lastName': '',
+          'address': '',
+          'city': '',
+          'state': '',
+          'country': '',
+          'postcode': '',
           'defaultAddress': false,
         }).isDefault,
         false,
@@ -191,7 +214,7 @@ void main() {
       };
 
       final order = RecentOrder.fromJson(json);
-      expect(order.orderNumber, '#00003845');
+      expect(order.orderNumber, '#3845');
       expect(order.status, 'processing');
       expect(order.grandTotal, 1645.00);
       expect(order.itemCount, 2);
@@ -200,13 +223,13 @@ void main() {
       expect(order.baseImageUrl, 'https://example.com/img.jpg');
     });
 
-    test('orderNumber pads with zeros', () {
+    test('orderNumber uses increment id without zero padding', () {
       final order = RecentOrder.fromJson({
         'incrementId': 42,
         'status': 'pending',
         'grandTotal': 0,
       });
-      expect(order.orderNumber, '#00000042');
+      expect(order.orderNumber, '#42');
     });
 
     test('handles string grand total', () {
@@ -223,6 +246,24 @@ void main() {
         'grandTotal': 100,
       });
       expect(order.itemCount, 0);
+    });
+  });
+
+  group('OrderShipment', () {
+    test('shipmentNumber prefers shippingNumber from the API', () {
+      final shipment = OrderShipment.fromJson({
+        'id': '12',
+        '_id': 9,
+        'shippingNumber': '575',
+      });
+
+      expect(shipment.shipmentNumber, '#575');
+    });
+
+    test('shipmentNumber falls back to numeric id without zero padding', () {
+      final shipment = OrderShipment.fromJson({'id': '12', '_id': 9});
+
+      expect(shipment.shipmentNumber, '#9');
     });
   });
 
@@ -247,10 +288,7 @@ void main() {
 
     test('fromJson handles string price', () {
       final json = {
-        'product': {
-          'name': 'Test',
-          'price': '49.99',
-        },
+        'product': {'name': 'Test', 'price': '49.99'},
       };
 
       final item = WishlistItem.fromJson(json);
@@ -287,25 +325,37 @@ void main() {
     test('ratingLabel returns correct label', () {
       expect(
         ProductReview.fromJson({
-          'name': '', 'title': '', 'rating': 5, 'comment': '',
+          'name': '',
+          'title': '',
+          'rating': 5,
+          'comment': '',
         }).ratingLabel,
         'Excellent',
       );
       expect(
         ProductReview.fromJson({
-          'name': '', 'title': '', 'rating': 3, 'comment': '',
+          'name': '',
+          'title': '',
+          'rating': 3,
+          'comment': '',
         }).ratingLabel,
         'Average',
       );
       expect(
         ProductReview.fromJson({
-          'name': '', 'title': '', 'rating': 2, 'comment': '',
+          'name': '',
+          'title': '',
+          'rating': 2,
+          'comment': '',
         }).ratingLabel,
         'Below Average',
       );
       expect(
         ProductReview.fromJson({
-          'name': '', 'title': '', 'rating': 1, 'comment': '',
+          'name': '',
+          'title': '',
+          'rating': 1,
+          'comment': '',
         }).ratingLabel,
         'Poor',
       );

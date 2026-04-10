@@ -58,9 +58,13 @@ class CheckoutPage extends StatelessWidget {
     );
 
     return BlocProvider(
-      create: (_) =>
-          CheckoutBloc(repository: repo, getLatestAuthToken: getLatestAuthToken)
-            ..add(InitCheckout(cart: cartState.cart, isGuest: isGuest)),
+      create: (_) => CheckoutBloc(
+        repository: repo,
+        getLatestAuthToken: getLatestAuthToken,
+        onCartRefreshRequested: () {
+          context.read<CartBloc>().add(LoadCart());
+        },
+      )..add(InitCheckout(cart: cartState.cart, isGuest: isGuest)),
       child: const _CheckoutPageView(),
     );
   }
@@ -76,6 +80,14 @@ class _CheckoutPageView extends StatefulWidget {
 class _CheckoutPageViewState extends State<_CheckoutPageView> {
   final TextEditingController _couponController = TextEditingController();
   bool _useSameAddress = true;
+
+  bool _requiresShipping(CheckoutState state) => !state.isVirtualOnly;
+
+  bool _usesBillingAsShipping(CheckoutState state) =>
+      state.isVirtualOnly || _useSameAddress;
+
+  bool _showsSeparateShippingForm(CheckoutState state) =>
+      _requiresShipping(state) && !_useSameAddress;
 
   // Local selection state for immediate UI response
   String? _selectedShippingMethod;
@@ -171,7 +183,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             if (checkoutState.cart == cartState.cart) return;
 
             checkoutBloc.add(
-              InitCheckout(
+              SyncCheckoutCart(
                 cart: cartState.cart,
                 isGuest: _isGuestCheckout(context, cartState),
               ),
@@ -206,7 +218,8 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             );
           }
           // Sync local address selections with bloc state
-          if (state.selectedAddress != null && _selectedBillingAddress == null) {
+          if (state.selectedAddress != null &&
+              _selectedBillingAddress == null) {
             _selectedBillingAddress = state.selectedAddress;
           }
           // Reset local selections when bloc resets downstream state
@@ -230,78 +243,91 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
           if (state.selectedPaymentMethod == null) {
             _selectedPaymentMethod = null;
           }
+          if (state.isVirtualOnly && !_useSameAddress) {
+            setState(() => _useSameAddress = true);
+          }
         },
         builder: (context, state) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
           final cart = state.cart;
           return Scaffold(
-          backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
-          body: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                _buildAppBar(context),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        // Billing Address
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildBillingSection(context, state),
-                        ),
-                        const SizedBox(height: 16),
-                        // Shipping Address (only when NOT using same address and NOT virtual only)
-                        if (!_useSameAddress && !state.isVirtualOnly) ...[
+            backgroundColor: isDark ? AppColors.neutral900 : AppColors.white,
+            body: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  _buildAppBar(context),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
+                          // Billing Address
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _buildShippingAddressSection(context, state),
+                            child: _buildBillingSection(context, state),
                           ),
                           const SizedBox(height: 16),
-                        ],
-                        // Cart Items
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildCartItemsSection(context, cart),
-                        ),
-                        const SizedBox(height: 16),
-                        // Shipping Method (only when NOT virtual only)
-                        if (!state.isVirtualOnly) ...[
+                          // Shipping Address (only when NOT using same address and NOT virtual only)
+                          if (_showsSeparateShippingForm(state)) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              child: _buildShippingAddressSection(
+                                context,
+                                state,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          // Cart Items
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _buildShippingMethodSection(context, state),
+                            child: _buildCartItemsSection(context, cart),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
+                          // Shipping Method (only when NOT virtual only)
+                          if (!state.isVirtualOnly) ...[
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              child: _buildShippingMethodSection(
+                                context,
+                                state,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          // Payment Method
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _buildPaymentMethodSection(context, state),
+                          ),
+                          const SizedBox(height: 32),
+                          // Coupon
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _buildCouponSection(context, state),
+                          ),
+                          const SizedBox(height: 32),
+                          // Price Break
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _buildPriceBreakSection(context, cart),
+                          ),
+                          const SizedBox(height: 100),
                         ],
-                        // Payment Method
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildPaymentMethodSection(context, state),
-                        ),
-                        const SizedBox(height: 32),
-                        // Coupon
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildCouponSection(context, state),
-                        ),
-                        const SizedBox(height: 32),
-                        // Price Break
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildPriceBreakSection(context, cart),
-                        ),
-                        const SizedBox(height: 100),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-                _buildBottomBar(context, cart, state),
-              ],
+                  _buildBottomBar(context, cart, state),
+                ],
+              ),
             ),
-          ),
           );
         },
       ),
@@ -761,8 +787,9 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                     child: ListView.separated(
                       controller: scrollController,
                       itemCount: addresses.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, index) {
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
                         final addr = addresses[index];
                         final isSelected = isBilling
                             ? _selectedBillingAddress?.id == addr.id
@@ -1017,10 +1044,11 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
               AppLocalizations.of(context)!.checkoutCompanyOptional,
             ),
             const SizedBox(height: 12),
-            _buildSameAddressCheckbox(context),
+            if (_requiresShipping(state)) _buildSameAddressCheckbox(context),
             // Only show Save button here if using same address for shipping.
-            // Otherwise it appears after the shipping form.
-            if (_useSameAddress) ...[
+            // For virtual/downloadable/booking carts there is no shipping form,
+            // so the button must stay here as well.
+            if (_usesBillingAsShipping(state)) ...[
               const SizedBox(height: 16),
               _buildSaveAddressButton(context, state),
             ],
@@ -1561,9 +1589,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
             ),
             const SizedBox(width: 4),
             Text(
-              ' ' +
-                  AppLocalizations.of(context)!.checkoutUseSameAddressShipping +
-                  ' ',
+              ' ${AppLocalizations.of(context)!.checkoutUseSameAddressShipping} ',
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
@@ -1613,11 +1639,13 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
 
   void _onSaveAddress(BuildContext context, CheckoutState state) {
     Map<String, dynamic> input;
+    final useSameAddressForShipping = _usesBillingAsShipping(state);
 
     if (state.isGuest || state.selectedAddress == null) {
       if (_billingFormKey.currentState == null ||
-          !_billingFormKey.currentState!.validate())
+          !_billingFormKey.currentState!.validate()) {
         return;
+      }
 
       input = {
         'billingFirstName': _billingFirstNameCtrl.text.trim(),
@@ -1630,13 +1658,14 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
         'billingState': _billingState,
         'billingPostcode': _billingPostcodeCtrl.text.trim(),
         'billingPhoneNumber': _billingPhoneCtrl.text.trim(),
-        'useForShipping': _useSameAddress,
+        'useForShipping': useSameAddressForShipping,
       };
 
-      if (!_useSameAddress) {
+      if (!useSameAddressForShipping) {
         if (_shippingFormKey.currentState == null ||
-            !_shippingFormKey.currentState!.validate())
+            !_shippingFormKey.currentState!.validate()) {
           return;
+        }
         input.addAll({
           'shippingFirstName': _shippingFirstNameCtrl.text.trim(),
           'shippingLastName': _shippingLastNameCtrl.text.trim(),
@@ -1668,10 +1697,10 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
       context.read<CheckoutBloc>().add(SelectSavedAddress(address: formAddr));
     } else {
       input = state.selectedAddress!.toBillingInput(
-        useForShipping: _useSameAddress,
+        useForShipping: useSameAddressForShipping,
       );
 
-      if (!_useSameAddress && _selectedShippingAddress != null) {
+      if (!useSameAddressForShipping && _selectedShippingAddress != null) {
         final sa = _selectedShippingAddress!;
         input.addAll({
           'shippingFirstName': sa.firstName,
@@ -1780,12 +1809,12 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
                   ? CachedNetworkImage(
                       imageUrl: imageUrl,
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
+                      placeholder: (context, url) => Container(
                         color: isDark
                             ? AppColors.neutral700
                             : AppColors.neutral200,
                       ),
-                      errorWidget: (_, __, ___) => Container(
+                      errorWidget: (context, url, error) => Container(
                         color: isDark
                             ? AppColors.neutral700
                             : AppColors.neutral200,
@@ -2537,22 +2566,23 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
   Widget _buildPriceBreakSection(BuildContext context, CartModel cart) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final subtotal = cart.subtotal > 0
-        ? (cart.formattedSubtotal ?? CurrencyFormatter.formatAmount(cart.subtotal))
+        ? (cart.formattedSubtotal ??
+              CurrencyFormatter.formatAmount(cart.subtotal))
         : CurrencyFormatter.formatAmount(0);
     final discount = cart.discountAmount > 0
         ? '-${cart.formattedDiscountAmount ?? CurrencyFormatter.formatAmount(cart.discountAmount)}'
         : CurrencyFormatter.formatAmount(0);
     final shipping = cart.shippingAmount > 0
         ? (cart.formattedShippingAmount ??
-            CurrencyFormatter.formatAmount(cart.shippingAmount))
+              CurrencyFormatter.formatAmount(cart.shippingAmount))
         : CurrencyFormatter.formatAmount(0);
     final tax = cart.taxAmount > 0
         ? (cart.formattedTaxAmount ??
-            CurrencyFormatter.formatAmount(cart.taxAmount))
+              CurrencyFormatter.formatAmount(cart.taxAmount))
         : CurrencyFormatter.formatAmount(0);
     final grandTotal = cart.grandTotal > 0
         ? (cart.formattedGrandTotal ??
-            CurrencyFormatter.formatAmount(cart.grandTotal))
+              CurrencyFormatter.formatAmount(cart.grandTotal))
         : CurrencyFormatter.formatAmount(0);
 
     return Column(
@@ -2646,7 +2676,7 @@ class _CheckoutPageViewState extends State<_CheckoutPageView> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final grandTotal = cart.grandTotal > 0
         ? (cart.formattedGrandTotal ??
-            CurrencyFormatter.formatAmount(cart.grandTotal))
+              CurrencyFormatter.formatAmount(cart.grandTotal))
         : CurrencyFormatter.formatAmount(0);
     final canPlace = state.canPlaceOrder;
 

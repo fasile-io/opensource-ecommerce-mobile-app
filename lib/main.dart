@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:upgrader/upgrader.dart';
 import 'l10n/app_localizations.dart';
 import 'core/channel/channel_bootstrap_service.dart';
 import 'core/graphql/graphql_client.dart';
@@ -18,12 +16,12 @@ import 'core/wishlist/wishlist_cubit.dart';
 import 'core/notifications/firebase_service.dart';
 import 'core/notifications/fcm_service.dart';
 import 'core/error/error_mapper.dart';
+import 'core/widgets/app_update_gate.dart';
 import 'features/auth/data/repository/auth_repository.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/category/presentation/pages/category_products_grid_page.dart';
 import 'features/product/presentation/pages/product_detail_page.dart';
 import 'features/account/presentation/pages/order_detail_page.dart';
-import 'features/account/presentation/bloc/order_detail_bloc.dart';
 import 'features/account/data/repository/account_repository.dart';
 import 'features/category/data/repository/category_repository.dart';
 import 'features/category/presentation/bloc/category_bloc.dart';
@@ -244,7 +242,7 @@ Future<void> _navigateFromNotificationData(Map<String, dynamic> data) async {
         mainShellContext,
         orderId: orderId,
         orderNumber: orderNumber?.toString(),
-        repository: repository!,
+        repository: repository,
       );
     } else {
       debugPrint('ℹ️ Unknown notification type from local tap: $type');
@@ -326,6 +324,7 @@ Future<void> _navigateFromNotification(RemoteMessage message) async {
         debugPrint('🛍️ Fetching product details for ID: $productId');
 
         try {
+          final navigator = Navigator.of(mainShellContext);
           final repository = mainShellContext.read<CategoryRepository>();
           final product = await repository.getProductById(productId);
 
@@ -338,7 +337,7 @@ Future<void> _navigateFromNotification(RemoteMessage message) async {
             '✅ Product fetched: ${product.name} (URL key: ${product.urlKey})',
           );
 
-          Navigator.of(mainShellContext).push(
+          navigator.push(
             MaterialPageRoute(
               builder: (_) => ProductDetailPage(
                 urlKey: product.urlKey!,
@@ -405,7 +404,7 @@ Future<void> _navigateFromNotification(RemoteMessage message) async {
         mainShellContext,
         orderId: orderId,
         orderNumber: orderNumber?.toString(),
-        repository: repository!,
+        repository: repository,
       );
     } else {
       debugPrint('ℹ️ Unknown notification type: $type');
@@ -512,7 +511,7 @@ class BagistoApp extends StatelessWidget {
 ///  • On login  → fires [OnUserLoggedIn] which switches the cart bearer token
 ///    to the auth access token and merges the guest cart into the user's cart.
 ///
-///  • On logout → fires [OnUserLoggedOut] which clears the user's cart and
+///  • On logout → fires [OnUserLoggedOut] which resets cart state and
 ///    creates a fresh guest cart session.
 class _AppWithAuthCartSync extends StatefulWidget {
   const _AppWithAuthCartSync();
@@ -636,11 +635,7 @@ class _AppWithAuthCartSyncState extends State<_AppWithAuthCartSync> {
                 ],
                 supportedLocales: AppLocalizations.supportedLocales,
                 home: SplashScreen(
-                  nextScreen: UpgradeAlert(
-                    upgrader: Upgrader(
-                      durationUntilAlertAgain: const Duration(days: 1),
-                     
-                    ),
+                  nextScreen: AppUpdateGate(
                     child: MainShell(key: MainShell.navigatorKey),
                   ),
                 ),

@@ -490,6 +490,11 @@ class ProductQueries {
                   formattedSpecialPrice
                   specialPriceFrom
                   specialPriceTo
+                  translation {
+                    locale
+                    name
+                    description
+                  }
                 }
               }
             }
@@ -654,6 +659,11 @@ class ProductQueries {
                   formattedSpecialPrice
                   specialPriceFrom
                   specialPriceTo
+                  translation {
+                    locale
+                    name
+                    description
+                  }
                 }
               }
             }
@@ -1026,6 +1036,11 @@ $slotFields
                   specialPrice
                   specialPriceFrom
                   specialPriceTo
+                  translation {
+                    locale
+                    name
+                    description
+                  }
                 }
               }
             }

@@ -1,14 +1,16 @@
-/// Tests for the Bagisto checkout flow — verifying the critical distinction
-/// between the Bearer auth token and the cart query token ($token variable).
-///
-/// Root cause of the original bug:
-///   Bagisto uses TWO different tokens during checkout:
-///     1. Bearer auth token (login token like "292|abc...") → Authorization header
-///     2. Cart query token  (user ID like "19")             → $token variable
-///   The old code conflated them, passing the auth token as $token, which failed.
+// Tests for the Bagisto checkout flow — verifying the critical distinction
+// between the Bearer auth token and the cart query token ($token variable).
+//
+// Root cause of the original bug:
+//   Bagisto uses TWO different tokens during checkout:
+//     1. Bearer auth token (login token like "292|abc...") -> Authorization header
+//     2. Cart query token  (user ID like "19")             -> $token variable
+//   The old code conflated them, passing the auth token as $token, which failed.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:bagisto_flutter/features/cart/data/models/cart_model.dart';
 import 'package:bagisto_flutter/features/checkout/data/models/checkout_model.dart';
+import 'package:bagisto_flutter/features/checkout/presentation/bloc/checkout_bloc.dart';
 
 void main() {
   // ════════════════════════════════════════════════════════════════════════
@@ -32,11 +34,7 @@ void main() {
     });
 
     test('handles null cartToken gracefully', () {
-      final json = {
-        'success': true,
-        'message': 'OK',
-        'id': '100',
-      };
+      final json = {'success': true, 'message': 'OK', 'id': '100'};
       final response = CheckoutAddressResponse.fromJson(json);
 
       expect(response.success, true);
@@ -116,21 +114,14 @@ void main() {
     });
 
     test('success defaults to false when orderId is null', () {
-      final json = {
-        'id': null,
-        'orderId': null,
-        'success': null,
-      };
+      final json = {'id': null, 'orderId': null, 'success': null};
       final response = CheckoutOrderResponse.fromJson(json);
 
       expect(response.success, false);
     });
 
     test('explicit success=true overrides orderId check', () {
-      final json = {
-        'success': true,
-        'orderId': null,
-      };
+      final json = {'success': true, 'orderId': null};
       final response = CheckoutOrderResponse.fromJson(json);
 
       expect(response.success, true);
@@ -380,8 +371,9 @@ void main() {
 
     test('copyWith preserves cartToken (query token)', () {
       const state = CheckoutState(cartToken: '19');
-      final newState =
-          state.copyWith(status: CheckoutStatus.shippingRatesFetched);
+      final newState = state.copyWith(
+        status: CheckoutStatus.shippingRatesFetched,
+      );
 
       expect(newState.cartToken, '19');
       expect(newState.status, CheckoutStatus.shippingRatesFetched);
@@ -441,6 +433,16 @@ void main() {
       expect(e1, isNot(equals(e3)));
     });
 
+    test('SyncCheckoutCart equality', () {
+      const cart = CartModel.empty;
+      const e1 = SyncCheckoutCart(cart: cart, isGuest: false);
+      const e2 = SyncCheckoutCart(cart: cart, isGuest: false);
+      const e3 = SyncCheckoutCart(cart: cart, isGuest: true);
+
+      expect(e1, equals(e2));
+      expect(e1, isNot(equals(e3)));
+    });
+
     test('SelectPaymentMethod equality', () {
       const e1 = SelectPaymentMethod(paymentMethodCode: 'moneytransfer');
       const e2 = SelectPaymentMethod(paymentMethodCode: 'moneytransfer');
@@ -471,8 +473,7 @@ void main() {
 
   group('Token flow logic (the critical fix)', () {
     test('cartToken from address response is NOT the auth token', () {
-      const authToken =
-          '292|example_auth_token_for_test_validation_only_12345';
+      const authToken = '292|63wcgHLYiCNOPrSH2uz2o1EePs3QOC05jn2M7sNH21f7d595';
       const addressResponse = {
         'success': true,
         'message': 'Address saved successfully',
@@ -489,8 +490,7 @@ void main() {
 
     test('shipping rates query uses cartToken, not authToken', () {
       const queryToken = '19';
-      const authToken =
-          '292|example_auth_token_for_test_validation_only_12345';
+      const authToken = '292|63wcgHLYiCNOPrSH2uz2o1EePs3QOC05jn2M7sNH21f7d595';
 
       expect(queryToken, isNot(equals(authToken)));
       expect(queryToken.length, lessThan(5));

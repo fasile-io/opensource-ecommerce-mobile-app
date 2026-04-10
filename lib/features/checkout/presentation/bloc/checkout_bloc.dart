@@ -25,6 +25,15 @@ class InitCheckout extends CheckoutEvent {
   List<Object?> get props => [cart, isGuest];
 }
 
+/// Sync shared cart updates into checkout without re-running init.
+class SyncCheckoutCart extends CheckoutEvent {
+  final CartModel cart;
+  final bool? isGuest;
+  const SyncCheckoutCart({required this.cart, this.isGuest});
+  @override
+  List<Object?> get props => [cart, isGuest];
+}
+
 /// Save checkout address (billing + shipping)
 class SaveCheckoutAddressEvent extends CheckoutEvent {
   final Map<String, dynamic> input;
@@ -297,9 +306,16 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
   /// Returns the latest Bearer auth token (login token or guest session UUID).
   final String? Function()? getLatestAuthToken;
 
-  CheckoutBloc({required this.repository, this.getLatestAuthToken})
-    : super(const CheckoutState()) {
+  /// Triggers a shared cart refresh so checkout totals stay current.
+  final VoidCallback? onCartRefreshRequested;
+
+  CheckoutBloc({
+    required this.repository,
+    this.getLatestAuthToken,
+    this.onCartRefreshRequested,
+  }) : super(const CheckoutState()) {
     on<InitCheckout>(_onInitCheckout);
+    on<SyncCheckoutCart>(_onSyncCheckoutCart);
     on<SaveCheckoutAddressEvent>(_onSaveCheckoutAddress);
     on<SelectSavedAddress>(_onSelectSavedAddress);
     on<SelectShippingMethod>(_onSelectShippingMethod);
@@ -324,6 +340,10 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         '[CheckoutBloc] WARNING _refreshAuthToken: no valid auth token available',
       );
     }
+  }
+
+  void _requestCartRefresh() {
+    onCartRefreshRequested?.call();
   }
 
   /// 1) Store cart, determine guest/logged-in, fetch addresses only for logged-in
@@ -448,6 +468,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
                 );
 
                 if (shipResp.success) {
+                  _requestCartRefresh();
                   final methods = await repository.getPaymentMethods();
                   debugPrint(
                     '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
@@ -558,6 +579,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
                   );
 
                   if (shipResp.success) {
+                    _requestCartRefresh();
                     final methods = await repository.getPaymentMethods();
                     debugPrint(
                       '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
@@ -696,6 +718,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
                     );
 
                     if (shipResp.success) {
+                      _requestCartRefresh();
                       final methods = await repository.getPaymentMethods();
                       debugPrint(
                         '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
@@ -774,6 +797,19 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         ),
       );
     }
+  }
+
+  void _onSyncCheckoutCart(
+    SyncCheckoutCart event,
+    Emitter<CheckoutState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        cart: event.cart,
+        isGuest: event.isGuest ?? state.isGuest,
+        isVirtualOnly: event.cart.isVirtualOnly,
+      ),
+    );
   }
 
   /// Select a saved address (for logged-in users switching between addresses)
@@ -879,6 +915,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
             );
 
             if (shipResp.success) {
+              _requestCartRefresh();
               final methods = await repository.getPaymentMethods();
               debugPrint(
                 '[CheckoutBloc] Auto-fetched ${methods.length} payment methods',
@@ -1039,6 +1076,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
             );
 
             if (shipResp.success) {
+              _requestCartRefresh();
               // Fetch payment methods
               final methods = await repository.getPaymentMethods();
               debugPrint(
@@ -1118,8 +1156,6 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
     );
     _refreshAuthToken();
 
-    print("rshtjyjgjhgj");
-
     try {
       final response = await repository.saveShippingMethod(
         event.shippingMethodCode,
@@ -1134,6 +1170,7 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         );
         return;
       }
+      _requestCartRefresh();
       emit(state.copyWith(status: CheckoutStatus.shippingSaved));
 
       // Fetch payment methods using the stored cart query token
@@ -1334,6 +1371,11 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
     ToggleSameAddress event,
     Emitter<CheckoutState> emit,
   ) {
+    if (state.isVirtualOnly) {
+      emit(state.copyWith(useSameAddressForShipping: true));
+      return;
+    }
+
     emit(
       state.copyWith(
         useSameAddressForShipping: !state.useSameAddressForShipping,

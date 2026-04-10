@@ -567,6 +567,8 @@
   "accountDeleteWarning": "This action is permanent and cannot be undone. All your data will be deleted.",
   "accountEnterYourPassword": "Enter your password",
   "accountDelete": "Delete",
+  "accountDeleteAddress": "Delete Address",
+  "accountDeleteAddressConfirm": "Are you sure you want to delete this address?",
   "accountGenderMale": "Male",
   "accountGenderFemale": "Female",
   "accountGenderOther": "Other",
